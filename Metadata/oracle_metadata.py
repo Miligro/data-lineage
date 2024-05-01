@@ -12,7 +12,7 @@ class OracleDatabaseMetadata:
 
     def connect(self):
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        oracle_client_dir = os.path.join(base_dir, "oracle_client")
+        oracle_client_dir = os.path.join(base_dir, "instantclient_19_9")
         cx_Oracle.init_oracle_client(lib_dir=oracle_client_dir)
 
         dsn_tns = cx_Oracle.makedsn(self.host, self.port, service_name=self.dbname)
