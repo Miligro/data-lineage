@@ -18,7 +18,7 @@ class PostgresDatabaseMetadata:
             password=self.password,
             port=self.port
         )
-        print("Connected to the database.")
+        print("Connected to the database - PostgreSQL.")
 
     def close(self):
         if self.conn:
