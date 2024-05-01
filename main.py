@@ -38,7 +38,7 @@ def oracle_lineage():
         constraints = oracle_metadata.fetch_table_constraints()
         views = oracle_metadata.fetch_view_dependencies()
         procedures = oracle_metadata.fetch_stored_procedures()
-        data_lineage = DataLineageGraph(columns, constraints, views, procedures)
+        data_lineage = DataLineageGraph(columns, constraints, views, procedures, True)
         data_lineage.draw_graph()
     finally:
         oracle_metadata.close()
