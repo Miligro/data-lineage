@@ -1,8 +1,8 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QComboBox, QLineEdit, QPushButton, QVBoxLayout, QMessageBox, QMainWindow
-from Metadata.postgres_metadata import PostgresDatabaseMetadata
-from Metadata.sqlserver_metadata import SQLServerDatabaseMetadata
-from Metadata.oracle_metadata import OracleDatabaseMetadata
+from DatabasesManagement.postgres_metadata import PostgresDatabaseMetadata
+from DatabasesManagement.sqlserver_metadata import SQLServerDatabaseMetadata
+from DatabasesManagement.oracle_metadata import OracleDatabaseMetadata
 from Lineage.data_lineage import DataLineageGraph
 
 class LineageTrackerApp(QMainWindow):

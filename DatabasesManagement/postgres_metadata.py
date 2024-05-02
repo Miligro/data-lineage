@@ -1,7 +1,7 @@
 import psycopg2
 
 
-class PostgresDatabaseMetadata:
+class PostgresDatabaseManagement:
     def __init__(self, host, dbname, user, password, port=5431):
         self.host = host
         self.dbname = dbname
@@ -92,3 +92,50 @@ class PostgresDatabaseMetadata:
                     AND routine_type='PROCEDURE';
             """)
             return cur.fetchall()
+
+    def create_temporal_objects_tables(self):
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS temporal_objects (
+                id SERIAL PRIMARY KEY,
+                object_name VARCHAR(100) NOT NULL,
+                object_type VARCHAR(50) NOT NULL,
+                created_from VARCHAR(100),
+                created_for VARCHAR(100)
+            )
+        ''')
+        self.connection.commit()
+
+    def create_data_lineage_index(self):
+        self.cursor.execute('''
+            CREATE INDEX IF NOT EXISTS data_lineage_index 
+            ON temporal_objects (created_for)
+            WHERE created_from IS NOT NULL
+        ''')
+        self.connection.commit()
+
+    def create_temporal_objects_trigger(self):
+        self.cursor.execute('''
+            CREATE OR REPLACE FUNCTION handle_temporal_object_creation()
+            RETURNS event_trigger AS $$
+            BEGIN
+                IF tg_tag = 'CREATE TABLE' OR tg_tag = 'CREATE VIEW' OR tg_tag = 'CREATE PROCEDURE' THEN
+                    IF EXISTS (
+                        SELECT 1 FROM pg_event_trigger_ddl_commands() 
+                        WHERE command_tag = tg_tag 
+                        AND (object_identity LIKE 'temp_%' OR object_identity LIKE 'temp%')
+                    ) THEN
+                        INSERT INTO temporal_objects (object_name, object_type, created_from)
+                        VALUES (TG_TABLE_NAME, tg_tag, NULL);
+                    END IF;
+                END IF;
+            END;
+            $$ LANGUAGE plpgsql;
+        ''')
+        self.connection.commit()
+
+        self.cursor.execute('''
+            CREATE EVENT TRIGGER handle_temporal_object_creation_trigger
+            ON ddl_command_end
+            EXECUTE FUNCTION handle_temporal_object_creation();
+        ''')
+        self.connection.commit()
