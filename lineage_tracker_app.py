@@ -1,9 +1,10 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QComboBox, QLineEdit, QPushButton, QVBoxLayout, QMessageBox, QMainWindow
-from DatabasesManagement.postgres_metadata import PostgresDatabaseMetadata
-from DatabasesManagement.sqlserver_metadata import SQLServerDatabaseMetadata
-from DatabasesManagement.oracle_metadata import OracleDatabaseMetadata
+from DatabasesManagement.postgres_management import PostgresDatabaseManagement
+from DatabasesManagement.sqlserver_management import SQLServerDatabaseManagement
+from DatabasesManagement.oracle_management import OracleDatabaseManagement
 from Lineage.data_lineage import DataLineageGraph
+
 
 class LineageTrackerApp(QMainWindow):
     def __init__(self):
@@ -78,11 +79,11 @@ class LineageTrackerApp(QMainWindow):
 
         self.selected_db = self.db_combo.currentText()
         if self.selected_db == "PostgreSQL":
-            self.db_metadata = PostgresDatabaseMetadata(host, dbname, user, password, port)
+            self.db_metadata = PostgresDatabaseManagement(host, dbname, user, password, port)
         elif self.selected_db == 'SQL Server':
-            self.db_metadata = SQLServerDatabaseMetadata(host, dbname, user, password, port)
+            self.db_metadata = SQLServerDatabaseManagement(host, dbname, user, password, port)
         elif self.selected_db == "Oracle":
-            self.db_metadata = OracleDatabaseMetadata(host, port, dbname, user, password)
+            self.db_metadata = OracleDatabaseManagement(host, port, dbname, user, password)
         try:
             self.db_metadata.connect()
             self.logged_in = True

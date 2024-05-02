@@ -1,6 +1,7 @@
 import pyodbc
 
-class SQLServerDatabaseMetadata:
+
+class SQLServerDatabaseManagement:
     def __init__(self, server, database, username, password, port=1433):
         self.server = server
         self.database = database
