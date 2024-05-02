@@ -4,8 +4,8 @@ from Metadata.sqlserver_metadata import SQLServerDatabaseMetadata
 from Metadata.oracle_metadata import OracleDatabaseMetadata
 
 
-def postgres_lineage():
-    postgres_metadata = PostgresDatabaseMetadata('localhost', 'bank', 'postgres', 'Mysecretpassword123!', 5431)
+def postgres_lineage(host, database, username, password, port):
+    postgres_metadata = PostgresDatabaseMetadata(host, database, username, password, port)
     try:
         postgres_metadata.connect()
         columns = postgres_metadata.fetch_table_metadata()
@@ -17,8 +17,8 @@ def postgres_lineage():
     finally:
         postgres_metadata.close()
 
-def sqlserver_lineage():
-    sql_server_metadata = SQLServerDatabaseMetadata('localhost', 'bank', 'SA', 'Mysecretpassword123!')
+def sqlserver_lineage(host, database, username, password, port):
+    sql_server_metadata = SQLServerDatabaseMetadata(host, database, username, password, port)
     try:
         sql_server_metadata.connect()
         columns = sql_server_metadata.fetch_table_metadata()
@@ -30,8 +30,8 @@ def sqlserver_lineage():
     finally:
         sql_server_metadata.close()
 
-def oracle_lineage():
-    oracle_metadata = OracleDatabaseMetadata('localhost', 1521, 'XE', 'system', 'Mysecretpassword123!')
+def oracle_lineage(host, database, username, password, port):
+    oracle_metadata = OracleDatabaseMetadata(host, port, database, username, password)
     try:
         oracle_metadata.connect()
         columns = oracle_metadata.fetch_table_metadata()
@@ -45,6 +45,6 @@ def oracle_lineage():
 
 
 if __name__ == "__main__":
-    postgres_lineage()
-    sqlserver_lineage()
-    oracle_lineage()
+    postgres_lineage('localhost', 'bank', 'postgres', 'Mysecretpassword123!', 5431)
+    sqlserver_lineage('localhost', 'bank', 'SA', 'Mysecretpassword123!', 1433)
+    oracle_lineage('localhost', 'XE', 'system', 'Mysecretpassword123!', 1521)
