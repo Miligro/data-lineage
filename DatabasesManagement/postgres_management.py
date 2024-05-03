@@ -92,50 +92,107 @@ class PostgresDatabaseManagement:
                     AND routine_type='PROCEDURE';
             """)
             return cur.fetchall()
+    
+    def fetch_system_operations(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    operation_type,
+                    obj_name,
+                    obj_parent
+                FROM
+                    system_operations;
+            """)
+            return cur.fetchall()
+        
+    def handle_create_table_as_function(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                CREATE OR REPLACE FUNCTION handle_create_table_as_function()
+                RETURNS event_trigger AS $$
+                DECLARE
+                    query_text text;
+                    name text;
+                    parent text;
+                BEGIN
+                    EXECUTE 'SELECT current_query()' INTO query_text;
 
-    def create_temporal_objects_tables(self):
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS temporal_objects (
-                id SERIAL PRIMARY KEY,
-                object_name VARCHAR(100) NOT NULL,
-                object_type VARCHAR(50) NOT NULL,
-                created_from VARCHAR(100),
-                created_for VARCHAR(100)
-            )
-        ''')
-        self.connection.commit()
+                    -- Parsowanie zapytania SQL i wstawienie danych do system_operations
+                    name := (SELECT (regexp_matches(query_text, 'CREATE (?:TEMP )?TABLE (\w+)', 'g'))[1]);
+                    parent := (SELECT (regexp_matches(query_text, 'FROM (\w+)', 'g'))[1]);
+                    INSERT INTO system_operations (operation_type, obj_name, obj_parent) VALUES ('CREATE TABLE', name, parent);
 
-    def create_data_lineage_index(self):
-        self.cursor.execute('''
-            CREATE INDEX IF NOT EXISTS data_lineage_index 
-            ON temporal_objects (created_for)
-            WHERE created_from IS NOT NULL
-        ''')
-        self.connection.commit()
+                END;
+                $$ LANGUAGE plpgsql;
+            """)
+        self.conn.commit()
 
-    def create_temporal_objects_trigger(self):
-        self.cursor.execute('''
-            CREATE OR REPLACE FUNCTION handle_temporal_object_creation()
-            RETURNS event_trigger AS $$
-            BEGIN
-                IF tg_tag = 'CREATE TABLE' OR tg_tag = 'CREATE VIEW' OR tg_tag = 'CREATE PROCEDURE' THEN
-                    IF EXISTS (
-                        SELECT 1 FROM pg_event_trigger_ddl_commands() 
-                        WHERE command_tag = tg_tag 
-                        AND (object_identity LIKE 'temp_%' OR object_identity LIKE 'temp%')
-                    ) THEN
-                        INSERT INTO temporal_objects (object_name, object_type, created_from)
-                        VALUES (TG_TABLE_NAME, tg_tag, NULL);
-                    END IF;
-                END IF;
-            END;
-            $$ LANGUAGE plpgsql;
-        ''')
-        self.connection.commit()
+    def create_table_as_trigger(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                CREATE EVENT TRIGGER create_table_as_trigger
+                ON ddl_command_end
+                WHEN tag IN ('CREATE TABLE AS')
+                EXECUTE FUNCTION handle_create_table_as_function();
+            """)
+        self.conn.commit()
 
-        self.cursor.execute('''
-            CREATE EVENT TRIGGER handle_temporal_object_creation_trigger
-            ON ddl_command_end
-            EXECUTE FUNCTION handle_temporal_object_creation();
-        ''')
-        self.connection.commit()
+    def create_system_operations_table(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS system_operations (
+                    id SERIAL PRIMARY KEY,
+                    operation_type TEXT,
+                    obj_name TEXT,
+                    obj_parent TEXT
+                )
+            """)
+        self.conn.commit()
+    
+    # Test function - to be removed later
+    def create_customer_finance_summary(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                CREATE TEMP TABLE extended_customer_finance_temp AS
+                SELECT 
+                    catv.customer_id,
+                    catv.first_name,
+                    catv.last_name,
+                    catv.ssn,
+                    catv.address,
+                    catv.phone_number,
+                    catv.email_address,
+                    catv.account_number,
+                    catv.account_type,
+                    catv.balance,
+                    catv.transaction_id,
+                    catv.sender_account_number,
+                    catv.receiver_account_number,
+                    catv.amount,
+                    catv.transaction_date,
+                    catv.transaction_description,
+                    l.loan_id,
+                    l.loan_amount,
+                    l.repayment_period,
+                    l.interest_rate,
+                    l.loan_date,
+                    l.loan_status
+                FROM customer_account_transactions_view catv
+                LEFT JOIN loans l ON catv.customer_id = l.customer_id;
+            """)
+            
+            cur.execute("""
+                CREATE TABLE customer_finance_summary AS
+                SELECT
+                    customer_id,
+                    first_name,
+                    last_name,
+                    COUNT(DISTINCT account_number) AS number_of_accounts,
+                    SUM(balance) AS total_balance,
+                    SUM(CASE WHEN loan_status = 'Active' THEN loan_amount ELSE 0 END) AS total_active_loans,
+                    SUM(amount) AS total_transactions_value,
+                    MAX(transaction_date) AS last_transaction_date
+                FROM extended_customer_finance_temp
+                GROUP BY customer_id, first_name, last_name;
+            """)
+        self.conn.commit()

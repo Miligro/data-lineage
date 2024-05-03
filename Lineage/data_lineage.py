@@ -2,12 +2,13 @@ import networkx as nx
 import plotly.graph_objects as go
 
 class DataLineageGraph:
-    def __init__(self, columns, constraints, views, procedures, oracle=False):
+    def __init__(self, columns, constraints, views, procedures, temp_operations, oracle=False):
         self.graph = nx.DiGraph()
         self.columns = columns
         self.constraints = constraints
         self.views = views
         self.procedures = procedures
+        self.temp_operations = temp_operations
         self.oracleDB = oracle
         self.build_lineage_graph()
 
@@ -40,11 +41,18 @@ class DataLineageGraph:
             else:
                 procedure_name = procedure[1]
             self.graph.add_node(procedure_name, style='filled', fillcolor='green')
+    
+    def add_system_operations_to_graph(self):
+        operations = self.temp_operations
+        for operation in operations:
+            _, object_name, object_parent_name = operation
+            self.graph.add_edge(object_parent_name, object_name, style='dashed')
 
     def build_lineage_graph(self):
         self.add_foreign_key_edges()
         self.add_view_dependencies_edges()
         self.add_procedures_edges()
+        self.add_system_operations_to_graph()
 
     def draw_graph(self):
         pos = nx.spring_layout(self.graph)

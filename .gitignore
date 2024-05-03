@@ -2,3 +2,4 @@ venv
 instantclient_19_9
 .idea
 __pycache__
+test.py
