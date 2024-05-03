@@ -1,5 +1,6 @@
 venv
 instantclient_19_9
+instantclient_21_12
 .idea
 __pycache__
 test.py
