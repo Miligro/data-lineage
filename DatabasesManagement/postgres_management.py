@@ -113,15 +113,30 @@ class PostgresDatabaseManagement:
                 DECLARE
                     query_text text;
                     name text;
+                    parent_list text[];
                     parent text;
+                    join_tables text[];
+                    join_table text;
                 BEGIN
                     EXECUTE 'SELECT current_query()' INTO query_text;
 
-                    -- Parsowanie zapytania SQL i wstawienie danych do system_operations
                     name := (SELECT (regexp_matches(query_text, 'CREATE (?:TEMP )?TABLE (\w+)', 'g'))[1]);
-                    parent := (SELECT (regexp_matches(query_text, 'FROM (\w+)', 'g'))[1]);
-                    INSERT INTO system_operations (operation_type, obj_name, obj_parent) VALUES ('CREATE TABLE', name, parent);
+                    parent_list := (SELECT (regexp_matches(query_text, 'FROM (\w+)', 'g')));
+                    join_tables := (SELECT regexp_matches(query_text, '\w*\s*JOIN\s+(\w+)\s+', 'g'));
+                    
+                    IF array_length(parent_list, 1) IS NOT NULL THEN
+                        FOREACH parent IN ARRAY parent_list
+                        LOOP
+                            INSERT INTO system_operations (operation_type, obj_name, obj_parent) VALUES ('CREATE TABLE', name, parent);
+                        END LOOP;
+                    END IF;
 
+                    IF array_length(join_tables, 1) IS NOT NULL THEN
+                        FOREACH join_table IN ARRAY join_tables
+                        LOOP
+                            INSERT INTO system_operations (operation_type, obj_name, obj_parent) VALUES ('CREATE TABLE', name, join_table);
+                        END LOOP;
+                    END IF;
                 END;
                 $$ LANGUAGE plpgsql;
             """)
@@ -146,6 +161,53 @@ class PostgresDatabaseManagement:
                     obj_name TEXT,
                     obj_parent TEXT
                 )
+            """)
+        self.conn.commit()
+    
+    def create_view_trigger(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                CREATE EVENT TRIGGER create_view_trigger
+                ON ddl_command_end
+                WHEN tag IN ('CREATE VIEW')
+                EXECUTE FUNCTION handle_create_view_function();
+            """)
+        self.conn.commit()
+
+    def handle_create_view_function(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                CREATE OR REPLACE FUNCTION handle_create_view_function()
+                RETURNS event_trigger AS $$
+                DECLARE
+                    query_text text;
+                    name text;
+                    parent_list text[];
+                    parent text;
+                    join_tables text[];
+                    join_table text;
+                BEGIN
+                    EXECUTE 'SELECT current_query()' INTO query_text;
+
+                    name := (SELECT (regexp_matches(query_text, 'CREATE (?:TEMP )?VIEW (\w+)', 'g'))[1]);
+                    parent_list := (SELECT (regexp_matches(query_text, 'FROM (\w+)', 'g')));
+                    join_tables := (SELECT regexp_matches(query_text, '\w*\s*JOIN\s+(\w+)\s+', 'g'));
+                    
+                    IF array_length(parent_list, 1) IS NOT NULL THEN
+                        FOREACH parent IN ARRAY parent_list
+                        LOOP
+                            INSERT INTO system_operations (operation_type, obj_name, obj_parent) VALUES ('CREATE VIEW', name, parent);
+                        END LOOP;
+                    END IF;
+
+                    IF array_length(join_tables, 1) IS NOT NULL THEN
+                        FOREACH join_table IN ARRAY join_tables
+                        LOOP
+                            INSERT INTO system_operations (operation_type, obj_name, obj_parent) VALUES ('CREATE VIEW', name, join_table);
+                        END LOOP;
+                    END IF;
+                END;
+                $$ LANGUAGE plpgsql;
             """)
         self.conn.commit()
     
@@ -195,4 +257,47 @@ class PostgresDatabaseManagement:
                 FROM extended_customer_finance_temp
                 GROUP BY customer_id, first_name, last_name;
             """)
+
+            cur.execute("""
+                CREATE OR REPLACE PROCEDURE calculate_and_update_total_balances()
+                LANGUAGE plpgsql
+                AS $$
+                BEGIN
+                    DELETE FROM customer_total_balances;
+                    INSERT INTO customer_total_balances(customer_id, total_balance)
+                    SELECT customer_id, SUM(balance)
+                    FROM bank_accounts
+                    GROUP BY customer_id;
+                END;
+                $$;
+            """)
+        self.conn.commit()
+
+    # Test function - to be removed later
+    def create_temp_customer_loan_summary_table(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                CREATE TEMP VIEW customer_loan_summary_view_temp AS
+                SELECT
+                    c.customer_id,
+                    c.first_name,
+                    c.last_name,
+                    SUM(l.loan_amount) AS total_loan_amount,
+                    COUNT(l.loan_id) AS number_of_loans
+                FROM customers c
+                LEFT JOIN loans l ON c.customer_id = l.customer_id
+                GROUP BY c.customer_id, c.first_name, c.last_name;
+            """)
+
+            cur.execute("""
+                CREATE TEMP TABLE customer_loan_summary_table AS
+                SELECT
+                    customer_id,
+                    first_name,
+                    last_name,
+                    total_loan_amount,
+                    number_of_loans
+                FROM customer_loan_summary_view_temp;
+            """)
+
         self.conn.commit()

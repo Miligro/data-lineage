@@ -129,6 +129,8 @@ class LineageTrackerApp(QMainWindow):
                 self.db_metadata.create_system_operations_table()
                 self.db_metadata.handle_create_table_as_function()
                 self.db_metadata.create_table_as_trigger()
+                self.db_metadata.handle_create_view_function()
+                self.db_metadata.create_view_trigger()
                 QMessageBox.information(self, "Success", "Extension installed")
             except:
                 QMessageBox.critical(self, "Error", "Failed to install extension.")
