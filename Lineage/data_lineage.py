@@ -1,3 +1,4 @@
+import re
 import networkx as nx
 import plotly.graph_objects as go
 
@@ -41,6 +42,12 @@ class DataLineageGraph:
             else:
                 procedure_name = procedure[1]
             self.graph.add_node(procedure_name, style='filled', fillcolor='green')
+            cleaned_query = self.clean_query(procedure[3])
+            results = self.parse_procedure(procedure[1], cleaned_query)
+            for result in results:
+                self.graph.add_edge(result[0], result[1], style='dashed')
+                if len(result) == 3:
+                    self.graph.add_edge(result[1], result[2], style='dashed')
     
     def add_system_operations_to_graph(self):
         operations = self.temp_operations
@@ -53,6 +60,34 @@ class DataLineageGraph:
         self.add_view_dependencies_edges()
         self.add_procedures_edges()
         self.add_system_operations_to_graph()
+
+    def parse_procedure(self, procedure_name, query):
+        matches = re.finditer(r'\b(SELECT|INSERT|UPDATE|DELETE)\b', query, re.IGNORECASE)
+        operations = []
+
+        for match in matches:
+            operation = match.group(1)
+            start_index = match.end()
+            end_index = query.find(';', start_index)
+
+            operation_text = query[start_index:end_index]
+
+            tables_from = set(re.findall(r'\bFROM\s+(\w+)', operation_text, re.IGNORECASE))
+            tables_into = set(re.findall(r'\bINTO\s+(\w+)\b', operation_text, re.IGNORECASE))
+
+            for table_from in tables_from:
+                for table_into in tables_into:
+                    operations.append((table_from, procedure_name, table_into))
+
+        return operations
+
+    def clean_query(self, query):
+        cleaned_query = re.sub(r'[\n\t\r]+', ' ', query)
+        cleaned_query = re.sub(r'\s{2,}', ' ', cleaned_query)
+
+        cleaned_query = cleaned_query.strip()
+
+        return cleaned_query
 
     def draw_graph(self):
         pos = nx.spring_layout(self.graph)
