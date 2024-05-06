@@ -1,5 +1,0 @@
-C:\Users\milo2\Main\Magisterka\Praca\data-lineage-project\MyCLRFunction\obj\Release\net8.0\MyCLRFunctions.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\milo2\Main\Magisterka\Praca\data-lineage-project\MyCLRFunction\obj\Release\net8.0\MyCLRFunctions.AssemblyInfoInputs.cache
-C:\Users\milo2\Main\Magisterka\Praca\data-lineage-project\MyCLRFunction\obj\Release\net8.0\MyCLRFunctions.AssemblyInfo.cs
-C:\Users\milo2\Main\Magisterka\Praca\data-lineage-project\MyCLRFunction\obj\Release\net8.0\MyCLRFunctions.csproj.CoreCompileInputs.cache
-C:\Users\milo2\Main\Magisterka\Praca\data-lineage-project\MyCLRFunction\obj\Release\net8.0\MyCLRFunctions.sourcelink.json
