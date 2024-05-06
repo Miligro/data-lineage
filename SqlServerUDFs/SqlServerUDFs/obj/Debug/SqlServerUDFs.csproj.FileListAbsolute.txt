@@ -1,0 +1,6 @@
+C:\Users\milo2\Main\Magisterka\Praca\data-lineage-project\SqlServerUDFs\SqlServerUDFs\bin\Debug\SqlServerUDFs.dll
+C:\Users\milo2\Main\Magisterka\Praca\data-lineage-project\SqlServerUDFs\SqlServerUDFs\bin\Debug\SqlServerUDFs.pdb
+C:\Users\milo2\Main\Magisterka\Praca\data-lineage-project\SqlServerUDFs\SqlServerUDFs\obj\Debug\SqlServerUDFs.csproj.AssemblyReference.cache
+C:\Users\milo2\Main\Magisterka\Praca\data-lineage-project\SqlServerUDFs\SqlServerUDFs\obj\Debug\SqlServerUDFs.csproj.CoreCompileInputs.cache
+C:\Users\milo2\Main\Magisterka\Praca\data-lineage-project\SqlServerUDFs\SqlServerUDFs\obj\Debug\SqlServerUDFs.dll
+C:\Users\milo2\Main\Magisterka\Praca\data-lineage-project\SqlServerUDFs\SqlServerUDFs\obj\Debug\SqlServerUDFs.pdb
