@@ -134,8 +134,7 @@ class LineageTrackerApp(QMainWindow):
                 if self.selected_db == 'SQL Server':
                     self.db_metadata.create_temp_table_extended_event()
                 QMessageBox.information(self, "Success", "Extension installed")
-            except Exception as e:
-                print(e)
+            except:
                 QMessageBox.critical(self, "Error", "Failed to install extension.")
         else:
             QMessageBox.critical(self, "Error", "Not connected to any database.")

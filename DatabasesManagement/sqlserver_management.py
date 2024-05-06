@@ -12,10 +12,7 @@ class SQLServerDatabaseManagement:
 
     def connect(self):
         conn_str = f"DRIVER=ODBC Driver 17 for SQL Server;SERVER={self.server};DATABASE={self.database};UID={self.username};PWD={self.password}"
-        try:
-            self.conn = pyodbc.connect(conn_str)
-        except pyodbc.Error as e:
-            print(e)
+        self.conn = pyodbc.connect(conn_str)
         print("Connected to the database - SQL Server.")
 
     def close(self):
