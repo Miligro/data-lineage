@@ -280,7 +280,7 @@ class SQLServerDatabaseManagement:
     def extract_tables_from_queries(self, row):
         with self.conn.cursor() as cur:
             query_text = row[2]
-            parser = SQLParser.__init__(query_text)
+            parser = SQLParser(query_text)
             objects = parser.extract_related_objects()
             for object in objects:
                 if object != row[1]:
