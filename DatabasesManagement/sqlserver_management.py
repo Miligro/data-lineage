@@ -1,4 +1,5 @@
 import pyodbc
+from related_objects_extractor import extract_related_objects
 
 
 class SQLServerDatabaseManagement:
@@ -80,19 +81,47 @@ class SQLServerDatabaseManagement:
             """)
             return cur.fetchall()
 
-    def create_system_operations_table(self):
+    def fetch_system_operations(self):
         with self.conn.cursor() as cur:
-            cur.execute("""SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.system_operations') AND type in (N'U')""")
+            cur.execute("""
+                SELECT
+                    operation_type,
+                    obj_name,
+                    obj_parent
+                FROM
+                    system_operations_with_dependencies;
+            """)
+            return cur.fetchall()
+
+    def create_system_operations_with_query_table(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.system_operations_with_query') AND type in (N'U')""")
             exists = cur.fetchone()
             if not exists:
                 cur.execute("""
-                    CREATE TABLE dbo.system_operations (
+                    CREATE TABLE dbo.system_operations_with_query (
                         id INT IDENTITY PRIMARY KEY,
                         operation_type VARCHAR(255),
                         obj_name VARCHAR(255),
                         query VARCHAR(MAX),
                         query_hash VARBINARY(32),
                         UNIQUE(operation_type, obj_name, query_hash)
+                    );
+                """)
+        self.conn.commit()
+
+    def create_system_operations_with_dependencies(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.system_operations_with_dependencies') AND type in (N'U')""")
+            exists = cur.fetchone()
+            if not exists:
+                cur.execute("""
+                    CREATE TABLE dbo.system_operations_with_dependencies (
+                        id INT IDENTITY PRIMARY KEY,
+                        operation_type VARCHAR(255),
+                        obj_name VARCHAR(255),
+                        obj_parent VARCHAR(255),
+                        UNIQUE(operation_type, obj_name, obj_parent)
                     );
                 """)
         self.conn.commit()
@@ -112,7 +141,7 @@ class SQLServerDatabaseManagement:
                         @QueryText VARCHAR(MAX)
                     AS
                     BEGIN
-                        INSERT INTO system_operations(operation_type, obj_name, query, query_hash) VALUES('CREATE TABLE', @ObjectName, @QueryText, HASHBYTES('SHA2_256', @QueryText));
+                        INSERT INTO system_operations_with_query(operation_type, obj_name, query, query_hash) VALUES('CREATE TABLE', @ObjectName, @QueryText, HASHBYTES('SHA2_256', @QueryText));
                     END
                 """)
         self.conn.commit()
@@ -154,7 +183,7 @@ class SQLServerDatabaseManagement:
                         @QueryText VARCHAR(MAX)
                     AS
                     BEGIN
-                        INSERT INTO system_operations(operation_type, obj_name, query, query_hash) VALUES('CREATE VIEW', @ObjectName, @QueryText, HASHBYTES('SHA2_256', @QueryText));
+                        INSERT INTO system_operations_with_query(operation_type, obj_name, query, query_hash) VALUES('CREATE VIEW', @ObjectName, @QueryText, HASHBYTES('SHA2_256', @QueryText));
                     END
                 """)
         self.conn.commit()
@@ -182,6 +211,7 @@ class SQLServerDatabaseManagement:
         self.conn.commit()
 
     def create_temp_table_extended_event(self):
+        self.conn.autocommit = True
         with self.conn.cursor() as cur:
             cur.execute("""
                 SELECT *
@@ -210,12 +240,11 @@ class SQLServerDatabaseManagement:
                 cur.execute("""
                     ALTER EVENT SESSION [MonitorCreateTable] ON SERVER STATE = START;
                 """)
-        self.conn.commit()
+        self.conn.autocommit = False
 
     def insert_from_events_file(self):
         with self.conn.cursor() as cur:
             cur.execute("""
-            INSERT INTO system_operations (operation_type, obj_name, query, query_hash)
             SELECT
                 DISTINCT 'CREATE TABLE',
                 event_data.value( '(event/data[@name="object_name"]/value)[1]', 'nvarchar(255)' ) AS object_name,
@@ -225,11 +254,41 @@ class SQLServerDatabaseManagement:
                 (SELECT CAST(event_data AS XML) AS event_data
                  FROM sys.fn_xe_file_target_read_file('EventFile*.xel', NULL, NULL, NULL)) AS tab
             WHERE NOT EXISTS (
-                SELECT 1 FROM system_operations WHERE
+                SELECT 1 FROM system_operations_with_query WHERE
                 operation_type = 'CREATE TABLE' AND
                 obj_name = event_data.value('(event/data[@name="object_name"]/value)[1]', 'nvarchar(255)') AND
                 query_hash = HASHBYTES('SHA2_256', event_data.value('(event/action[@name="sql_text"]/value)[1]', 'nvarchar(max)'))
             );
             """)
+            rows = cur.fetchall()
+            for row in rows:
+                self.extract_tables_from_queries(row)
 
+    def operations_with_query_to_dependencies(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                SELECT operation_type, obj_name, query FROM system_operations_with_query;
+            """)
+            rows = cur.fetchall()
+            for row in rows:
+                self.extract_tables_from_queries(row)
+            cur.execute("""
+                DELETE FROM system_operations_with_query;
+            """)
+        self.conn.commit()
 
+    def extract_tables_from_queries(self, row):
+        with self.conn.cursor() as cur:
+            query_text = row[2]
+            objects = extract_related_objects(query_text)
+            for object in objects:
+                if object != row[1]:
+                    cur.execute("""
+                        MERGE INTO system_operations_with_dependencies AS target
+                        USING (SELECT ? AS operation_type, ? AS obj_name, ? AS obj_parent) AS source
+                        ON (target.operation_type = source.operation_type AND target.obj_name = source.obj_name AND target.obj_parent = source.obj_parent)
+                        WHEN NOT MATCHED THEN
+                            INSERT (operation_type, obj_name, obj_parent)
+                            VALUES (source.operation_type, source.obj_name, source.obj_parent);
+                    """, (row[0], row[1], object))
+        self.conn.commit()
