@@ -66,7 +66,7 @@ class DataLineageGraph:
         operations = []
 
         for match in matches:
-            operation = match.group(1)
+            _ = match.group(1)
             start_index = match.end()
             end_index = query.find(';', start_index)
 

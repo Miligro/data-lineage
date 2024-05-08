@@ -1,5 +1,5 @@
 import pyodbc
-from related_objects_extractor import extract_related_objects
+from DatabasesManagement.related_objects_extractor import SQLParser
 
 
 class SQLServerDatabaseManagement:
@@ -172,13 +172,13 @@ class SQLServerDatabaseManagement:
         with self.conn.cursor() as cur:
             cur.execute("""
                 SELECT * FROM sys.objects 
-                WHERE object_id = OBJECT_ID(N'dbo.handle_create_view_as_procedure') 
+                WHERE object_id = OBJECT_ID(N'dbo.handle_create_view_procedure') 
                 AND type in (N'P', N'PC')
             """)
             exists = cur.fetchone()
             if not exists:
                 cur.execute("""
-                    CREATE PROCEDURE handle_create_view_as_procedure
+                    CREATE PROCEDURE handle_create_view_procedure
                         @ObjectName VARCHAR(255),
                         @QueryText VARCHAR(MAX)
                     AS
@@ -205,7 +205,7 @@ class SQLServerDatabaseManagement:
                         DECLARE @EventData XML = EVENTDATA();
                         DECLARE @ObjectName NVARCHAR(128) = @EventData.value('(/EVENT_INSTANCE/ObjectName)[1]', 'NVARCHAR(128)');
                         DECLARE @QueryText NVARCHAR(MAX) = @EventData.value('(/EVENT_INSTANCE/TSQLCommand/CommandText)[1]', 'NVARCHAR(MAX)');
-                        EXEC handle_create_view_as_procedure @ObjectName=@ObjectName, @QueryText = @QueryText
+                        EXEC handle_create_view_procedure @ObjectName=@ObjectName, @QueryText = @QueryText
                     END
                 """)
         self.conn.commit()
@@ -280,7 +280,8 @@ class SQLServerDatabaseManagement:
     def extract_tables_from_queries(self, row):
         with self.conn.cursor() as cur:
             query_text = row[2]
-            objects = extract_related_objects(query_text)
+            parser = SQLParser.__init__(query_text)
+            objects = parser.extract_related_objects()
             for object in objects:
                 if object != row[1]:
                     cur.execute("""

@@ -1,5 +1,4 @@
 import sys
-sys.path.append('./DatabasesManagement')
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QComboBox, QLineEdit, QPushButton, QVBoxLayout, QMessageBox, QMainWindow
 from DatabasesManagement.postgres_management import PostgresDatabaseManagement
 from DatabasesManagement.sqlserver_management import SQLServerDatabaseManagement
@@ -113,7 +112,7 @@ class LineageTrackerApp(QMainWindow):
         if self.db_metadata:
             if self.selected_db == 'SQL Server':
                 self.db_metadata.insert_from_events_file()
-                self.db_metadata.operations_with_query_to_dependencies()
+            self.db_metadata.operations_with_query_to_dependencies()
             columns = self.db_metadata.fetch_table_metadata()
             constraints = self.db_metadata.fetch_table_constraints()
             views = self.db_metadata.fetch_view_dependencies()
@@ -131,11 +130,9 @@ class LineageTrackerApp(QMainWindow):
         if self.db_metadata:
             try:
                 if self.selected_db == 'SQL Server':
-                    self.db_metadata.create_system_operations_with_query_table()
-                    self.db_metadata.create_system_operations_with_dependencies()
                     self.db_metadata.create_temp_table_extended_event()
-                else:
-                    self.db_metadata.create_system_operations_table()
+                self.db_metadata.create_system_operations_with_query_table()
+                self.db_metadata.create_system_operations_with_dependencies()
                 self.db_metadata.handle_create_table_as_function()
                 self.db_metadata.create_table_as_trigger()
                 self.db_metadata.handle_create_view_function()

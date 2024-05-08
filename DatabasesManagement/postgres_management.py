@@ -1,5 +1,5 @@
 import psycopg2
-
+from DatabasesManagement.related_objects_extractor import SQLParser
 
 class PostgresDatabaseManagement:
     def __init__(self, host, dbname, user, password, port=5431):
@@ -101,46 +101,57 @@ class PostgresDatabaseManagement:
                     obj_name,
                     obj_parent
                 FROM
-                    system_operations;
+                    system_operations_with_dependencies;
             """)
             return cur.fetchall()
-        
-    def handle_create_table_as_function(self):
+    
+    def create_system_operations_with_query_table(self):
         with self.conn.cursor() as cur:
             cur.execute("""
-                CREATE OR REPLACE FUNCTION handle_create_table_as_function()
-                RETURNS event_trigger AS $$
-                DECLARE
-                    query_text text;
-                    name text;
-                    parent_list text[];
-                    parent text;
-                    join_tables text[];
-                    join_table text;
-                BEGIN
-                    EXECUTE 'SELECT current_query()' INTO query_text;
-
-                    name := (SELECT (regexp_matches(query_text, 'CREATE (?:TEMP )?TABLE (\w+)', 'g'))[1]);
-                    parent_list := (SELECT (regexp_matches(query_text, 'FROM (\w+)', 'g')));
-                    join_tables := (SELECT regexp_matches(query_text, '\w*\s*JOIN\s+(\w+)\s+', 'g'));
-                    
-                    IF array_length(parent_list, 1) IS NOT NULL THEN
-                        FOREACH parent IN ARRAY parent_list
-                        LOOP
-                            INSERT INTO system_operations (operation_type, obj_name, obj_parent) VALUES ('CREATE TABLE', name, parent);
-                        END LOOP;
-                    END IF;
-
-                    IF array_length(join_tables, 1) IS NOT NULL THEN
-                        FOREACH join_table IN ARRAY join_tables
-                        LOOP
-                            INSERT INTO system_operations (operation_type, obj_name, obj_parent) VALUES ('CREATE TABLE', name, join_table);
-                        END LOOP;
-                    END IF;
-                END;
-                $$ LANGUAGE plpgsql;
+                CREATE TABLE IF NOT EXISTS system_operations_with_query (
+                    id SERIAL PRIMARY KEY,
+                    operation_type VARCHAR(255),
+                    obj_name VARCHAR(255),
+                    query TEXT,
+                    UNIQUE(operation_type, obj_name, query)
+                )
             """)
         self.conn.commit()
+
+    def create_system_operations_with_dependencies(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS system_operations_with_dependencies (
+                    id SERIAL PRIMARY KEY,
+                    operation_type VARCHAR(255),
+                    obj_name VARCHAR(255),
+                    obj_parent VARCHAR(255),
+                    UNIQUE(operation_type, obj_name, obj_parent)
+                )
+            """)
+        self.conn.commit()
+        
+    def handle_create_table_as_function(self):
+            with self.conn.cursor() as cur:
+                cur.execute("""
+                    CREATE OR REPLACE FUNCTION handle_create_table_as_function()
+                    RETURNS event_trigger AS $$
+                    DECLARE
+                        query_text text;
+                        name text;
+                        ddl_command RECORD;
+                    BEGIN
+                        EXECUTE 'SELECT current_query()' INTO query_text;
+
+                        SELECT * INTO ddl_command FROM pg_event_trigger_ddl_commands() WHERE command_tag = 'CREATE TABLE AS';
+                        IF ddl_command IS NOT NULL THEN
+                            name := split_part(ddl_command.object_identity, '.', 2);
+                            INSERT INTO system_operations_with_query (operation_type, obj_name, query) VALUES ('CREATE TABLE', name, query_text);
+                        END IF;
+                    END;
+                    $$ LANGUAGE plpgsql;
+                """)
+            self.conn.commit()
 
     def create_table_as_trigger(self):
         with self.conn.cursor() as cur:
@@ -149,18 +160,6 @@ class PostgresDatabaseManagement:
                 ON ddl_command_end
                 WHEN tag IN ('CREATE TABLE AS')
                 EXECUTE FUNCTION handle_create_table_as_function();
-            """)
-        self.conn.commit()
-
-    def create_system_operations_table(self):
-        with self.conn.cursor() as cur:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS system_operations (
-                    id SERIAL PRIMARY KEY,
-                    operation_type TEXT,
-                    obj_name TEXT,
-                    obj_parent TEXT
-                )
             """)
         self.conn.commit()
     
@@ -182,33 +181,48 @@ class PostgresDatabaseManagement:
                 DECLARE
                     query_text text;
                     name text;
-                    parent_list text[];
-                    parent text;
-                    join_tables text[];
-                    join_table text;
+                    ddl_command RECORD;
                 BEGIN
                     EXECUTE 'SELECT current_query()' INTO query_text;
 
-                    name := (SELECT (regexp_matches(query_text, 'CREATE (?:TEMP )?VIEW (\w+)', 'g'))[1]);
-                    parent_list := (SELECT (regexp_matches(query_text, 'FROM (\w+)', 'g')));
-                    join_tables := (SELECT regexp_matches(query_text, '\w*\s*JOIN\s+(\w+)\s+', 'g'));
-                    
-                    IF array_length(parent_list, 1) IS NOT NULL THEN
-                        FOREACH parent IN ARRAY parent_list
-                        LOOP
-                            INSERT INTO system_operations (operation_type, obj_name, obj_parent) VALUES ('CREATE VIEW', name, parent);
-                        END LOOP;
-                    END IF;
-
-                    IF array_length(join_tables, 1) IS NOT NULL THEN
-                        FOREACH join_table IN ARRAY join_tables
-                        LOOP
-                            INSERT INTO system_operations (operation_type, obj_name, obj_parent) VALUES ('CREATE VIEW', name, join_table);
-                        END LOOP;
+                    SELECT * INTO ddl_command FROM pg_event_trigger_ddl_commands() WHERE command_tag = 'CREATE VIEW';
+                    IF ddl_command IS NOT NULL THEN
+                        name := split_part(ddl_command.object_identity, '.', 2);
+                        INSERT INTO system_operations_with_query (operation_type, obj_name, query) VALUES ('CREATE VIEW', name, query_text);
                     END IF;
                 END;
                 $$ LANGUAGE plpgsql;
             """)
+        self.conn.commit()
+    
+    def operations_with_query_to_dependencies(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                SELECT operation_type, obj_name, query FROM system_operations_with_query;
+            """)
+            rows = cur.fetchall()
+            for row in rows:
+                self._extract_tables_from_queries(row)
+            cur.execute("""
+                DELETE FROM system_operations_with_query;
+            """)
+        self.conn.commit()
+    
+    def _extract_tables_from_queries(self, row):
+        with self.conn.cursor() as cur:
+            query_text = row[2]
+            parser = SQLParser(query_text)
+            objects = parser.extract_related_objects()
+            for obj in objects:
+                if obj != row[1]:
+                    cur.execute("""
+                        INSERT INTO system_operations_with_dependencies (operation_type, obj_name, obj_parent)
+                        SELECT %s, %s, %s
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM system_operations_with_dependencies
+                            WHERE operation_type = %s AND obj_name = %s AND obj_parent = %s
+                        );
+                    """, (row[0], row[1], obj, row[0], row[1], obj))
         self.conn.commit()
     
     # Test function - to be removed later
