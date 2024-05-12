@@ -18,9 +18,8 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('list_database_ids/', views.list_database_ids, name='list_database_ids'),
-    path('check_extension_installed/<int:database_id>/', views.check_extension_installed, name='check_extension_installed'),
-    path('install_extension/<int:database_id>/', views.install_extension, name='install_extension'),
-    path('get_lineage_info/<int:database_id>/', views.get_lineage_info, name='get_lineage_info'),
+    path('list_database_ids/', views.ListDatabasesView.as_view(), name='list_database_ids'),
+    path('check_extension_installed/<str:database_id>/', views.CheckExtensionInstalledView.as_view(), name='check_extension_installed'),
+    path('install_extension/<str:database_id>/', views.InstallExtensionView.as_view(), name='install_extension'),
+    path('get_lineage_info/<str:database_id>/', views.ProcessLineageView.as_view(), name='get_lineage_info'),
 ]
-

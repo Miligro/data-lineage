@@ -3,6 +3,7 @@ import logging
 from django.views import View
 from django.conf import settings
 from django.http import JsonResponse
+from DatabasesManagement.related_objects_extractor import SQLParser
 from DatabasesManagement.postgres_management import PostgresDatabaseManagement
 from DatabasesManagement.sqlserver_management import SQLServerDatabaseManagement
 from DatabasesManagement.oracle_management import OracleDatabaseManagement
@@ -184,17 +185,20 @@ class ProcessLineageView(BaseDatabaseView):
             edge_id = f"{target_table}_{source_view}"
             edges_json.append({"data": {"id": edge_id, "source": target_table, "target": source_view}})
 
-        # TODO
-        # for procedure in procedures:
-        #     procedure_name = procedure[1]
-        #     cleaned_query = data_lineage_graph.clean_query(procedure[3])
-        #     results = data_lineage_graph.parse_procedure(procedure_name, cleaned_query)
-        #     for result in results:
-        #         if len(result) == 3:
-        #             source = result[0]
-        #             target = result[1]
-        #             edge_id = f"{source}_{target}"
-        #             edges_json.append({"data": {"id": edge_id, "source": source, "target": target}})
+        for procedure in procedures:
+            procedure_name = procedure[1]
+            parser = SQLParser(procedure[3])
+            objects = parser.extract_related_objects()
+            for obj in objects:
+                if obj != procedure_name:
+                    if procedure_name not in tables_names:
+                        tables_names.append(procedure_name)
+                        
+                    if obj not in tables_names:
+                        tables_names.append(obj)
+
+                    edge_id = f"{procedure_name}_{obj}"
+                    edges_json.append({"data": {"id": edge_id, "source": procedure_name, "target": obj}})
 
         for operation in operations:
             _, object_name, object_parent_name = operation
@@ -212,4 +216,3 @@ class ProcessLineageView(BaseDatabaseView):
             nodes_json.append({"data": {"id": table_name, "label": table_name}})
 
         return json.dumps({"nodes": nodes_json, "edges": edges_json}, indent=4)
-
