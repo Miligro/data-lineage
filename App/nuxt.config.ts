@@ -4,6 +4,11 @@ export default defineNuxtConfig({
   build: {
     transpile: ['vuetify'],
   },
+  runtimeConfig: {
+    public: {
+      baseURL: 'http://localhost:8080',
+    },
+  },
   plugins: ['~/plugins/vuetify'],
   modules: [
     (_options, nuxt) => {
@@ -19,6 +24,15 @@ export default defineNuxtConfig({
       template: {
         transformAssetUrls,
       },
+    },
+  },
+  hooks: {
+    'pages:extend'(pages) {
+      pages.push({
+        name: 'select-database',
+        path: '/',
+        file: '~/pages/select-database.vue',
+      })
     },
   },
 })

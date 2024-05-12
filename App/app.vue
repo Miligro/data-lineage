@@ -1,9 +1,9 @@
 <template>
-  <NuxtLayout>
-    <div id="app">
+  <div id="app">
+    <NuxtLayout>
       <NuxtPage />
-    </div>
-  </NuxtLayout>
+    </NuxtLayout>
+  </div>
 </template>
 
 <style lang="scss">

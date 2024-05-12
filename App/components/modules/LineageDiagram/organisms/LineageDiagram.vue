@@ -98,11 +98,9 @@ onMounted(() => {
       fit: false,
       name: 'breadthfirst',
       directed: false,
-      grid: true,
       padding: 10,
       spacingFactor: 1.3,
     },
-    zoom: 0.2,
     zoomingEnabled: true,
     userZoomingEnabled: true,
     wheelSensitivity: 0.2,
@@ -155,6 +153,8 @@ onMounted(() => {
     node.outgoers().removeClass('highlighted')
     node.outgoers('edge').removeClass('highlighted')
   })
+  cy.zoom(0.7)
+  cy.center()
 })
 </script>
 

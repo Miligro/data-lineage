@@ -1,6 +1,6 @@
 export default defineNuxtRouteMiddleware(() => {
   const databaseStore = useDatabaseStore()
-  if (!databaseStore.id) {
-    return navigateTo('/')
+  if (databaseStore.id) {
+    return navigateTo('/lineage')
   }
 })
