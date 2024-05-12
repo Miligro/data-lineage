@@ -11,17 +11,22 @@ from DatabasesManagement.oracle_management import OracleDatabaseManagement
 
 class BaseDatabaseView(View):
     def __init__(self):
-        super().__init__()
+        self.postgres_db = None
+        self.oracle_db = None
+        self.sql_server_db = None
+
+    def initialize_databases(self):
         self.postgres_db = self.get_database_connection("postgres")
         self.oracle_db = self.get_database_connection("oracle")
         self.sql_server_db = self.get_database_connection("sqlserver")
+        self.connect_to_databases()
 
     def get_database_connection(self, db_name):
         db_settings = settings.DATABASES[db_name]
         host = db_settings['HOST']
         dbname = db_settings['NAME']
         user = db_settings['USER']
-        port = db_settings['PROT']
+        port = db_settings['PORT']
         password = db_settings['PASSWORD']
 
         if db_settings['ENGINE'] == 'django.db.backends.postgresql':
@@ -37,8 +42,13 @@ class BaseDatabaseView(View):
         self.sql_server_db.connect()
 
 
-
 class ListDatabasesView(BaseDatabaseView):
+    def __new__(cls, *args, **kwargs):
+        if not hasattr(cls, '_instance'):
+            cls._instance = super().__new__(cls)
+            cls._instance.initialize_databases()
+        return cls._instance
+
     def get(self, request):
         database_ids = {
             'postgres': 'POS01',
