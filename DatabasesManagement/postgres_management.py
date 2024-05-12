@@ -24,6 +24,26 @@ class PostgresDatabaseManagement:
         if self.conn:
             self.conn.close()
             print("Database connection closed.")
+    
+    def check_extension_installed(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_name IN (
+                        'system_operations_with_query',
+                        'system_operations_with_dependencies'
+                    )
+                ) AND EXISTS (
+                    SELECT FROM pg_proc
+                    WHERE proname IN (
+                        'handle_create_table_as_function',
+                        'handle_create_view_function'
+                    )
+                );
+            """)
+            result = cur.fetchone()
+            return all(result)
 
     def fetch_table_metadata(self):
         with self.conn.cursor() as cur:

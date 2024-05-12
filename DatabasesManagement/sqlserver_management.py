@@ -20,6 +20,25 @@ class SQLServerDatabaseManagement:
         if self.conn:
             self.conn.close()
             print("Database connection closed.")
+    
+    def check_extension_installed(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_NAME IN ('system_operations_with_query', 'system_operations_with_dependencies')
+            """)
+            table_count = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM sys.objects
+                WHERE type IN ('P', 'PC')
+                AND (name = 'handle_create_table_as_procedure' OR name = 'handle_create_view_procedure')
+            """)
+            proc_count = cur.fetchone()[0]
+
+            return table_count == 2 and proc_count == 2
 
     def fetch_table_metadata(self):
         with self.conn.cursor() as cur:
