@@ -1,5 +1,5 @@
 """
-WSGI config for temp_lineage_tracker project.
+WSGI config for Api project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 

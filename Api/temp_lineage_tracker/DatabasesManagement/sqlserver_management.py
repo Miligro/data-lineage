@@ -1,5 +1,5 @@
 import pyodbc
-from DatabasesManagement.related_objects_extractor import SQLParser
+from .related_objects_extractor import SQLParser
 
 
 class SQLServerDatabaseManagement:

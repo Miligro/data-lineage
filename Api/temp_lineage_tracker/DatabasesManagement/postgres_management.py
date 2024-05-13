@@ -1,5 +1,6 @@
 import psycopg2
-from DatabasesManagement.related_objects_extractor import SQLParser
+from .related_objects_extractor import SQLParser
+
 
 class PostgresDatabaseManagement:
     def __init__(self, host, dbname, user, password, port=5431):
