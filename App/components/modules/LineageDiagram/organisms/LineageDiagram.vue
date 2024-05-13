@@ -23,47 +23,16 @@ nodeHtmlLabel(cytoscape)
 const cyContainer = ref<HTMLElement | null>(null)
 const zoomLevel = ref(1.0)
 
+const databaseStore = useDatabaseStore()
+
+const response = await useApiFetch(`/get_lineage_info/${databaseStore.id}`)
+
 onMounted(() => {
   if (!cyContainer.value) return
 
   const cy = cytoscape({
     container: cyContainer.value,
-    elements: [
-      {
-        data: {
-          id: 'a',
-          label: 'customer_account_bank_test_view_temp',
-        },
-      },
-      { data: { id: 'b', label: 'Table B' } },
-      { data: { id: 'c', label: 'Table C' } },
-      { data: { id: 'd', label: 'Table D' } },
-      { data: { id: 'e', label: 'Table E' } },
-      { data: { id: 'f', label: 'Table F' } },
-      { data: { id: 'g', label: 'Table G' } },
-      { data: { id: 'h', label: 'Table H' } },
-      { data: { id: 'i', label: 'Table I' } },
-      { data: { id: 'j', label: 'Table J' } },
-      { data: { id: 'k', label: 'Table K' } },
-      { data: { id: 'l', label: 'Table L' } },
-      { data: { id: 'm', label: 'Table M' } },
-      { data: { id: 'n', label: 'Table N' } },
-      { data: { id: 'o', label: 'Table O' } },
-      { data: { id: 'p', label: 'Table P' } },
-      { data: { id: 'ab', source: 'a', target: 'b' } },
-      { data: { id: 'bc', source: 'b', target: 'c' } },
-      { data: { id: 'ca', source: 'c', target: 'a' } },
-      { data: { id: 'cd', source: 'c', target: 'd' } },
-      { data: { id: 'bd', source: 'b', target: 'd' } },
-      { data: { id: 'aj', source: 'a', target: 'j' } },
-      { data: { id: 'ak', source: 'a', target: 'k' } },
-      { data: { id: 'bf', source: 'b', target: 'f' } },
-      { data: { id: 'bg', source: 'b', target: 'g' } },
-      { data: { id: 'jl', source: 'j', target: 'l' } },
-      { data: { id: 'ko', source: 'k', target: 'o' } },
-      { data: { id: 'kp', source: 'k', target: 'p' } },
-      { data: { id: 'mn', source: 'm', target: 'n' } },
-    ],
+    elements: [...response.nodes, ...response.edges],
     style: [
       {
         selector: 'node',

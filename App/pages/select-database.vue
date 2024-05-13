@@ -31,18 +31,10 @@ const selectDatabase = (selectedDatabase: DatabaseInterface) => {
   router.push('/lineage')
 }
 
-const { data }: { data: Array<DatabaseInterface> } =
-  await useApiFetch('/objects')
-databases.value = [
-  {
-    id: 1,
-    name: 'PostgreSQL',
-  },
-  {
-    id: 2,
-    name: 'SQL Server',
-  },
-]
+setTimeout(async () => {
+  const response = await $fetch('http://localhost:8000/list_database_ids')
+  databases.value = response.databases
+})
 </script>
 
 <style lang="scss" scoped>
