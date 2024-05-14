@@ -1,5 +1,4 @@
 import json
-import logging
 from django.views import View
 from django.conf import settings
 from django.http import JsonResponse
@@ -41,7 +40,6 @@ class BaseDatabaseView(View):
 
 
 class ListDatabasesView(BaseDatabaseView):
-
     def get(self, _):
         database_ids = {
             'databases': [
@@ -59,77 +57,6 @@ class ListDatabasesView(BaseDatabaseView):
             },
         ]}
         return JsonResponse(database_ids)
-
-
-class CheckExtensionInstalledView(BaseDatabaseView):
-    def get(self, _, database_id):
-        is_installed = False
-        if database_id == 'POS01':
-            is_installed = self.postgres_db.check_extension_installed()
-        elif database_id == 'ORA02':
-            # is_installed = self.oracle_db.check_extension_installed()
-            pass
-        elif database_id == 'SRV03':
-            is_installed = self.sql_server_db.check_extension_installed()
-        else:
-            return JsonResponse({'error': 'Invalid database ID'}, status=400)
-
-        return JsonResponse({'is_installed': is_installed})
-
-
-def install_extension(db_metadata):
-    try:
-        db_metadata.create_system_operations_with_query_table()
-        db_metadata.create_system_operations_with_dependencies()
-        db_metadata.handle_create_table_as_function()
-        db_metadata.create_table_as_trigger()
-        db_metadata.handle_create_view_function()
-        db_metadata.create_view_trigger()
-        return True
-    except Exception as e:
-        logging.error('Install ext. error: %s', e, exc_info=True)
-        return False
-
-
-class InstallExtensionView(BaseDatabaseView):
-
-    def install_sql_server_extension(self):
-        success = install_extension(self.sql_server_db)
-
-        if success:
-            try:
-                self.sql_server_db.create_temp_table_extended_event()
-                return True
-            except Exception as e:
-                logging.error('SQL Server adj. error: %s', e, exc_info=True)
-                return False
-        else:
-            return False
-
-    def install_postgres_extension(self):
-        return install_extension(self.postgres_db)
-
-    def install_oracle_extension(self):
-        return install_extension(self.oracle_db)
-
-    def post(self, test, database_id):
-        print(test)
-        print(database_id)
-        success = False
-        if database_id == 'POS01':
-            success = self.install_postgres_extension()
-        elif database_id == 'ORA02':
-            # success = self.install_oracle_extension()
-            pass
-        elif database_id == 'SRV03':
-            success = self.install_sql_server_extension()
-        else:
-            return JsonResponse({'error': 'Invalid database ID'}, status=400)
-
-        if success:
-            return JsonResponse({'message': 'Extension installed successfully'})
-        else:
-            return JsonResponse({'error': 'Extension installation failed'}, status=500)
 
 
 def convert_to_json(columns, constraints, views, procedures, operations):
@@ -197,43 +124,23 @@ def convert_to_json(columns, constraints, views, procedures, operations):
     return json.dumps({"nodes": nodes_json, "edges": edges_json}, indent=4)
 
 
+def process_linege(db_metadata):
+    columns = db_metadata.fetch_table_metadata()
+    constraints = db_metadata.fetch_table_constraints()
+    views = db_metadata.fetch_view_dependencies()
+    procedures = db_metadata.fetch_stored_procedures()
+
+    return convert_to_json(columns, constraints, views, procedures)
+    
+
 class ProcessLineageView(BaseDatabaseView):
     def get(self, request, database_id):
         response = None
         if database_id == 'POS01':
-            return JsonResponse(json.loads(self.process_postgres_lineage()))
+            return JsonResponse(json.loads(self.postgres_db))
         elif database_id == 'ORA02':
-            return JsonResponse(json.loads(self.process_oracle_lineage()))
+            return JsonResponse(json.loads(self.oracle_db))
         elif database_id == 'SRV03':
-            return JsonResponse(json.loads(self.process_sql_server_lineage()))
+            return JsonResponse(json.loads(self.sql_server_db))
         else:
             return JsonResponse({'error': 'Invalid database ID'}, status=400)
-
-    def process_postgres_lineage(self):
-        self.postgres_db.operations_with_query_to_dependencies()
-        columns = self.postgres_db.fetch_table_metadata()
-        constraints = self.postgres_db.fetch_table_constraints()
-        views = self.postgres_db.fetch_view_dependencies()
-        procedures = self.postgres_db.fetch_stored_procedures()
-        operations = self.postgres_db.fetch_system_operations()
-
-        return convert_to_json(columns, constraints, views, procedures, operations)
-        
-    def process_oracle_lineage(self):
-        columns = self.oracle_db.fetch_table_metadata()
-        constraints = self.oracle_db.fetch_table_constraints()
-        views = self.oracle_db.fetch_view_dependencies()
-        procedures = self.oracle_db.fetch_stored_procedures()
-
-        return convert_to_json(columns, constraints, views, procedures, [])
-        
-    def process_sql_server_lineage(self):
-        self.sql_server_db.insert_from_events_file()
-        self.sql_server_db.operations_with_query_to_dependencies()
-        columns = self.sql_server_db.fetch_table_metadata()
-        constraints = self.sql_server_db.fetch_table_constraints()
-        views = self.sql_server_db.fetch_view_dependencies()
-        procedures = self.sql_server_db.fetch_stored_procedures()
-        operations = self.sql_server_db.fetch_system_operations()
-        
-        return convert_to_json(columns, constraints, views, procedures, operations)
