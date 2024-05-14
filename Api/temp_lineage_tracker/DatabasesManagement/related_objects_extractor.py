@@ -34,7 +34,7 @@ class SQLParser:
             if(token.is_group):
                 for result in self._extract_from_part(token):
                     yield result
-            if token.ttype is Keyword and token.value.upper() in ["FROM", "JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN"]:
+            if token.ttype is Keyword and token.value.upper() in ["FROM", "JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "EXEC", "EXECUTE", "CALL"]:
                 i += 1
                 while i < len(parsed.tokens) and (parsed.tokens[i].ttype is Whitespace or parsed.tokens[i].ttype is Punctuation):
                     i += 1
@@ -46,7 +46,7 @@ class SQLParser:
                     else:
                         yield next_token
             i += 1
-
+    
     def extract_related_objects(self):
         stream = self._extract_from_part(self.parse)
         return list(self._extract_table_identifiers(stream))
