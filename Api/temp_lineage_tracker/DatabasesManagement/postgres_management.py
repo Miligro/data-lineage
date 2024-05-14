@@ -92,3 +92,19 @@ class PostgresDatabaseManagement:
                     AND routine_type='PROCEDURE';
             """)
             return cur.fetchall()
+
+    def fetch_stored_functions(self):
+        with self.conn.cursor() as cur:
+            cur.execute("""
+              SELECT
+                  routine_schema,
+                  routine_name,
+                  data_type,
+                  routine_definition
+              FROM
+                  information_schema.routines
+              WHERE
+                  routine_schema NOT IN ('pg_catalog', 'information_schema')
+                  AND routine_type='FUNCTION';
+          """)
+            return cur.fetchall()

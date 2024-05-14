@@ -1,11 +1,11 @@
 import sqlparse
 from sqlparse.tokens import DML, Keyword, Whitespace, Punctuation
-from sqlparse.sql import IdentifierList, Identifier
+from sqlparse.sql import IdentifierList, Identifier, Function
 
 class SQLParser:
     def __init__(self, sql):
         formatted = sqlparse.format(sql, strip_whitespace=True)
-        self.parse = sqlparse.parse(formatted)[0]
+        self.parsedQueries = sqlparse.parse(formatted)
 
     def _is_subselect(self, parsed):
         if not parsed.is_group:
@@ -17,13 +17,13 @@ class SQLParser:
                 return True
         return False
 
-    def _extract_table_identifiers(self, tokens):
+    def _extract_identifiers(self, tokens):
         for token in tokens:
             if isinstance(token, IdentifierList):
                 for identifier in token.get_identifiers():
                     if identifier.get_real_name():
                         yield identifier.get_real_name()
-            elif isinstance(token, Identifier):
+            elif isinstance(token, (Identifier, Function)):
                 if token.get_real_name():
                     yield token.get_real_name()
 
@@ -46,7 +46,10 @@ class SQLParser:
                     else:
                         yield next_token
             i += 1
-    
+
     def extract_related_objects(self):
-        stream = self._extract_from_part(self.parse)
-        return list(self._extract_table_identifiers(stream))
+        results = []
+        for query in self.parsedQueries:
+            stream = self._extract_from_part(query)
+            results.extend(list(self._extract_identifiers(stream)))
+        return results

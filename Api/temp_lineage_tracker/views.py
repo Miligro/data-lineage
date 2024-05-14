@@ -59,7 +59,7 @@ class ListDatabasesView(BaseDatabaseView):
         return JsonResponse(database_ids)
 
 
-def convert_to_json(columns, constraints, views, procedures):
+def convert_to_json(columns, constraints, views, procedures, functions):
     tables_names = []
     nodes_json = []
     edges_json = []
@@ -91,10 +91,12 @@ def convert_to_json(columns, constraints, views, procedures):
         edge_id = f"{target_table}_{source_view}"
         edges_json.append({"data": {"id": edge_id, "source": target_table, "target": source_view}})
 
-    for procedure in procedures:
+    for procedure in procedures + functions:
         procedure_name = procedure[1]
         parser = SQLParser(procedure[3])
+        print(procedure[3], end='\n\n\n')
         objects = parser.extract_related_objects()
+        print(objects, end='\n\n\n')
         for obj in objects:
             if obj != procedure_name:
                 if procedure_name not in tables_names:
@@ -112,22 +114,23 @@ def convert_to_json(columns, constraints, views, procedures):
     return json.dumps({"nodes": nodes_json, "edges": edges_json}, indent=4)
 
 
-def process_linege(db_metadata):
+def process_lineage(db_metadata):
     columns = db_metadata.fetch_table_metadata()
     constraints = db_metadata.fetch_table_constraints()
     views = db_metadata.fetch_view_dependencies()
     procedures = db_metadata.fetch_stored_procedures()
+    functions = db_metadata.fetch_stored_functions()
 
-    return convert_to_json(columns, constraints, views, procedures)
+    return convert_to_json(columns, constraints, views, procedures, functions)
     
 
 class ProcessLineageView(BaseDatabaseView):
     def get(self, _, database_id):
         if database_id == 'POS01':
-            return JsonResponse(json.loads(self.postgres_db))
+            return JsonResponse(json.loads(process_lineage(self.postgres_db)))
         elif database_id == 'ORA02':
-            return JsonResponse(json.loads(self.oracle_db))
+            return JsonResponse(json.loads(process_lineage(self.oracle_db)))
         elif database_id == 'SRV03':
-            return JsonResponse(json.loads(self.sql_server_db))
+            return JsonResponse(json.loads(process_lineage(self.sql_server_db)))
         else:
             return JsonResponse({'error': 'Invalid database ID'}, status=400)
