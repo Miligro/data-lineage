@@ -94,9 +94,7 @@ def convert_to_json(columns, constraints, views, procedures, functions):
     for procedure in procedures + functions:
         procedure_name = procedure[1]
         parser = SQLParser(procedure[3])
-        print(procedure[3], end='\n\n\n')
         objects = parser.extract_related_objects()
-        print(objects, end='\n\n\n')
         for obj in objects:
             if obj != procedure_name:
                 if procedure_name not in tables_names:
