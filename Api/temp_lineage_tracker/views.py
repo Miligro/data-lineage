@@ -59,7 +59,7 @@ class ListDatabasesView(BaseDatabaseView):
         return JsonResponse(database_ids)
 
 
-def convert_to_json(columns, constraints, views, procedures, operations):
+def convert_to_json(columns, constraints, views, procedures):
     tables_names = []
     nodes_json = []
     edges_json = []
@@ -106,18 +106,6 @@ def convert_to_json(columns, constraints, views, procedures, operations):
                 edge_id = f"{procedure_name}_{obj}"
                 edges_json.append({"data": {"id": edge_id, "source": procedure_name, "target": obj}})
 
-    for operation in operations:
-        _, object_name, object_parent_name = operation
-
-        if object_name not in tables_names:
-            tables_names.append(object_name)
-
-        if object_parent_name not in tables_names:
-            tables_names.append(object_parent_name)
-
-        edge_id = f"{object_parent_name}_{object_name}"
-        edges_json.append({"data": {"id": edge_id, "source": object_parent_name, "target": object_name}})
-
     for table_name in tables_names:
         nodes_json.append({"data": {"id": table_name, "label": table_name}})
 
@@ -134,8 +122,7 @@ def process_linege(db_metadata):
     
 
 class ProcessLineageView(BaseDatabaseView):
-    def get(self, request, database_id):
-        response = None
+    def get(self, _, database_id):
         if database_id == 'POS01':
             return JsonResponse(json.loads(self.postgres_db))
         elif database_id == 'ORA02':
