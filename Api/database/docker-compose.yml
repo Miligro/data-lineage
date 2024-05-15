@@ -1,0 +1,12 @@
+version: "3"
+services:
+  data-lineage-management:
+    image: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: LineageManagement
+    ports:
+      - "5431:5432"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
