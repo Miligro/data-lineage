@@ -3,11 +3,11 @@ from django.views import View
 from django.conf import settings
 from django.http import JsonResponse
 
-from .DatabasesManagement.related_objects_extractor import SQLParser
-from .DatabasesManagement.oracle_management import OracleDatabaseManagement
-from .DatabasesManagement.postgres_management import PostgresDatabaseManagement
-from .DatabasesManagement.sqlserver_management import SQLServerDatabaseManagement
-from .lineage_ml.model import ModelManager, visualize_relationships, predict_relationships
+from airflow.DatabasesManagement.related_objects_extractor import SQLParser
+from airflow.DatabasesManagement.oracle_management import OracleDatabaseManagement
+from airflow.DatabasesManagement.postgres_management import PostgresDatabaseManagement
+from airflow.DatabasesManagement.sqlserver_management import SQLServerDatabaseManagement
+from .lineage_ml.model import ModelManager
 
 
 def get_database_connection(db_name):

@@ -29,12 +29,9 @@ class PostgresDatabaseManagement:
         with self.conn.cursor() as cur:
             cur.execute("""
                 SELECT
-                    table_schema,
                     table_name,
                     column_name,
-                    data_type,
-                    is_nullable,
-                    column_default
+                    data_type
                 FROM
                     information_schema.columns
                 WHERE

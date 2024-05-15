@@ -3,8 +3,6 @@ instantclient_19_9
 instantclient_21_12
 .idea
 __pycache__
-test.py
-db.sqlite3
 
 # Nuxt dev/build outputs
 .output
