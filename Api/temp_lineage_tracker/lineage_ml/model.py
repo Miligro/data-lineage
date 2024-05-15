@@ -1,94 +1,16 @@
-from collections import defaultdict
-from itertools import permutations
-
-import pandas as pd
-from sqlalchemy import create_engine
-from Levenshtein import distance as levenshtein_distance
+import pickle
 import numpy as np
+import pandas as pd
+import networkx as nx
+import matplotlib.pyplot as plt
+from itertools import permutations
+from collections import defaultdict
+from sqlalchemy import create_engine
+from sklearn.metrics import accuracy_score
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-import matplotlib.pyplot as plt
-import networkx as nx
+from Levenshtein import distance as levenshtein_distance
 
-DATABASE_URI = 'postgresql+psycopg2://postgres:postgres@localhost:5432/online_store'
-
-
-def get_engine(database_uri):
-    return create_engine(database_uri)
-
-
-def get_metadata(engine):
-    query = """
-        SELECT table_name, column_name, data_type
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
-    """
-    return pd.read_sql(query, engine)
-
-
-def get_table_sample(engine, table_name, sample_size=1000):
-    query = f"SELECT * FROM {table_name} LIMIT {sample_size}"
-    return pd.read_sql(query, engine)
-
-
-engine = get_engine(DATABASE_URI)
-
-metadata = get_metadata(engine)
-
-samples = {}
-for table in metadata['table_name'].unique():
-    try:
-        samples[table] = get_table_sample(engine, table)
-    except Exception as e:
-        print(f"Failed to load data from table {table}: {e}")
-
-
-def analyze_table_names(metadata):
-    table_names = metadata['table_name'].unique()
-
-    n = len(table_names)
-    levenshtein_matrix = [[0] * n for _ in range(n)]
-    for i in range(n):
-        for j in range(n):
-            if i != j:
-                levenshtein_matrix[i][j] = levenshtein_distance(table_names[i], table_names[j])
-
-    return pd.DataFrame(levenshtein_matrix, index=table_names, columns=table_names)
-
-
-def analyze_column_names(metadata):
-    similarities = defaultdict(dict)
-
-    tables = metadata['table_name'].unique()
-
-    for table in tables:
-        table_columns = metadata[metadata['table_name'] == table][['column_name', 'data_type']]
-        for other_table in tables:
-            if table == other_table:
-                similarities[table][other_table] = 1.0
-                continue
-
-            other_table_columns = metadata[metadata['table_name'] == other_table][['column_name', 'data_type']]
-
-            total_similarity = 0
-            comparisons = 0
-            for col in table_columns['column_name']:
-                for other_col in other_table_columns['column_name']:
-                    total_similarity += levenshtein_distance(col, other_col)
-                    comparisons += 1
-
-            average_similarity = total_similarity / comparisons if comparisons > 0 else float('inf')
-
-            normalized_similarity = 1 / (1 + average_similarity) if average_similarity != float('inf') else 0
-
-            similarities[table][other_table] = normalized_similarity
-
-    return pd.DataFrame(similarities)
-
-
-table_name_similarities = analyze_table_names(metadata)
-table_columns_similarities = analyze_column_names(metadata)
 
 true_relationships = {
     ('products', 'categories'): 1,
@@ -186,39 +108,6 @@ true_relationships = {
     ('get_promotional_products_with_suppliers', 'suppliers'): 1
 }
 
-
-def prepare_training_data(metadata, name_similarities, columns_similarities, true_relationships):
-    X = []
-    y = []
-    table_names = metadata['table_name'].unique()
-    pairs = list(permutations(table_names, 2))
-
-    for pair in pairs:
-        label = true_relationships.get(pair, 0)
-
-        idx1 = name_similarities.index.get_loc(pair[0])
-        idx2 = name_similarities.columns.get_loc(pair[1])
-
-        name_similarity = name_similarities.iloc[idx1, idx2]
-        columns_similarity = columns_similarities.iloc[idx1, idx2]
-
-        X.append([name_similarity, columns_similarity])
-        y.append(label)
-
-    return np.array(X), np.array(y), pairs
-
-
-X, y, pairs = prepare_training_data(metadata, table_name_similarities, table_columns_similarities, true_relationships)
-
-X_train, X_test, y_train, y_test, pairs_train, pairs_test = train_test_split(X, y, pairs, test_size=0.3, random_state=42)
-
-model = RandomForestClassifier()
-model.fit(X_train, y_train)
-
-y_pred = model.predict(X_test)
-accuracy = accuracy_score(y_test, y_pred)
-print(f"Accuracy: {accuracy}")
-
 def predict_relationships(model, X_test, pairs):
     predictions = []
     for index, x in enumerate(X_test):
@@ -227,10 +116,6 @@ def predict_relationships(model, X_test, pairs):
             predictions.append(pairs[index])
     return predictions
 
-
-predicted_relationships = predict_relationships(model, X_test, pairs_test)
-# print(predicted_relationships)
-#
 def visualize_relationships(predicted_relationships):
     G = nx.Graph()
     for (table1, table2) in predicted_relationships:
@@ -240,4 +125,101 @@ def visualize_relationships(predicted_relationships):
     nx.draw(G, pos, with_labels=True, node_size=30, node_color="skyblue", font_size=5, font_color="black", font_weight="bold")
     plt.show()
 
+
+class ModelManager:
+    def __init__(self, database_uri='postgresql+psycopg2://postgres:postgres@localhost:5432/online_store'):
+        self.database_uri = database_uri
+        self.engine = create_engine(database_uri)
+        self.model = None
+
+    def _get_metadata(self):
+        query = """
+            SELECT table_name, column_name, data_type
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+        """
+        return pd.read_sql(query, self.engine)
+
+    def _analyze_table_names(self, metadata):
+        table_names = metadata['table_name'].unique()
+        n = len(table_names)
+        levenshtein_matrix = [[0] * n for _ in range(n)]
+        for i in range(n):
+            for j in range(n):
+                if i != j:
+                    levenshtein_matrix[i][j] = levenshtein_distance(table_names[i], table_names[j])
+        return pd.DataFrame(levenshtein_matrix, index=table_names, columns=table_names)
+
+    def _analyze_column_names(self, metadata):
+        similarities = defaultdict(dict)
+        tables = metadata['table_name'].unique()
+        for table in tables:
+            table_columns = metadata[metadata['table_name'] == table][['column_name', 'data_type']]
+            for other_table in tables:
+                if table == other_table:
+                    similarities[table][other_table] = 1.0
+                    continue
+                other_table_columns = metadata[metadata['table_name'] == other_table][['column_name', 'data_type']]
+                total_similarity = 0
+                comparisons = 0
+                for col in table_columns['column_name']:
+                    for other_col in other_table_columns['column_name']:
+                        total_similarity += levenshtein_distance(col, other_col)
+                        comparisons += 1
+                average_similarity = total_similarity / comparisons if comparisons > 0 else float('inf')
+                normalized_similarity = 1 / (1 + average_similarity) if average_similarity != float('inf') else 0
+                similarities[table][other_table] = normalized_similarity
+        return pd.DataFrame(similarities)
+
+    def _prepare_training_data(self, metadata, name_similarities, columns_similarities, true_relationships):
+        X = []
+        y = []
+        table_names = metadata['table_name'].unique()
+        pairs = list(permutations(table_names, 2))
+        for pair in pairs:
+            label = true_relationships.get(pair, 0)
+            idx1 = name_similarities.index.get_loc(pair[0])
+            idx2 = name_similarities.columns.get_loc(pair[1])
+            name_similarity = name_similarities.iloc[idx1, idx2]
+            columns_similarity = columns_similarities.iloc[idx1, idx2]
+            X.append([name_similarity, columns_similarity])
+            y.append(label)
+        return np.array(X), np.array(y), pairs
+
+    def train_model(self, true_relationships):
+        metadata = self._get_metadata()
+        table_name_similarities = self._analyze_table_names(metadata)
+        table_columns_similarities = self._analyze_column_names(metadata)
+        X, y, pairs = self._prepare_training_data(metadata, table_name_similarities, table_columns_similarities,
+                                              true_relationships)
+        X_train, X_test, y_train, y_test, _, pairs_test = train_test_split(X, y, pairs, test_size=0.3, random_state=42)
+        self.model = RandomForestClassifier()
+        self.model.fit(X_train, y_train)
+        y_pred = self.model.predict(X_test)
+        accuracy = accuracy_score(y_test, y_pred)
+        print(f"Accuracy: {accuracy}")
+
+        return X_test, pairs_test
+
+    def save_model(self, filepath):
+        if self.model:
+            with open(filepath, 'wb') as f:
+                pickle.dump(self.model, f)
+        else:
+            print("Model has not been trained yet.")
+    
+    def load_model(filepath):
+        with open(filepath, 'rb') as f:
+            return pickle.load(f)
+    
+
+manager = ModelManager()
+X_test, pairs_test = manager.train_model(true_relationships)
+manager.save_model('Api/temp_lineage_tracker/lineage_ml/models/forest.pkl')
+
+predicted_relationships = predict_relationships(manager.model, X_test, pairs_test)
+visualize_relationships(predicted_relationships)
+
+loaded_model = ModelManager.load_model('Api/temp_lineage_tracker/lineage_ml/models/forest.pkl')
+predicted_relationships = predict_relationships(loaded_model, X_test, pairs_test)
 visualize_relationships(predicted_relationships)

@@ -4,9 +4,10 @@ from django.conf import settings
 from django.http import JsonResponse
 
 from .DatabasesManagement.related_objects_extractor import SQLParser
+from .DatabasesManagement.oracle_management import OracleDatabaseManagement
 from .DatabasesManagement.postgres_management import PostgresDatabaseManagement
 from .DatabasesManagement.sqlserver_management import SQLServerDatabaseManagement
-from .DatabasesManagement.oracle_management import OracleDatabaseManagement
+from .lineage_ml.model import ModelManager, visualize_relationships, predict_relationships
 
 
 def get_database_connection(db_name):
@@ -132,3 +133,11 @@ class ProcessLineageView(BaseDatabaseView):
             return JsonResponse(json.loads(process_lineage(self.sql_server_db)))
         else:
             return JsonResponse({'error': 'Invalid database ID'}, status=400)
+
+
+class LineageModelView(BaseDatabaseView):
+    def post(self, _, database_id):
+        # TODO
+        loaded_model = ModelManager.load_model('Api/temp_lineage_tracker/lineage_ml/models/forest.pkl')
+        # predicted_relationships = predict_relationships(loaded_model, X_test, pairs_test)
+        # visualize_relationships(predicted_relationships)
