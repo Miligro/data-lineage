@@ -213,13 +213,13 @@ class ModelManager:
             return pickle.load(f)
     
 
-manager = ModelManager()
-X_test, pairs_test = manager.train_model(true_relationships)
-manager.save_model('Api/temp_lineage_tracker/lineage_ml/models/forest.pkl')
+# manager = ModelManager()
+# X_test, pairs_test = manager.train_model(true_relationships)
+# manager.save_model('Api/temp_lineage_tracker/lineage_ml/models/forest.pkl')
 
-predicted_relationships = predict_relationships(manager.model, X_test, pairs_test)
-visualize_relationships(predicted_relationships)
+# predicted_relationships = predict_relationships(manager.model, X_test, pairs_test)
+# visualize_relationships(predicted_relationships)
 
-loaded_model = ModelManager.load_model('Api/temp_lineage_tracker/lineage_ml/models/forest.pkl')
-predicted_relationships = predict_relationships(loaded_model, X_test, pairs_test)
-visualize_relationships(predicted_relationships)
+# loaded_model = ModelManager.load_model('Api/temp_lineage_tracker/lineage_ml/models/forest.pkl')
+# predicted_relationships = predict_relationships(loaded_model, X_test, pairs_test)
+# visualize_relationships(predicted_relationships)
