@@ -14,6 +14,5 @@ definePageMeta({
 <style lang="scss" scoped>
 .lineage-container {
   height: 100%;
-  padding: 2rem;
 }
 </style>

@@ -2,7 +2,7 @@
   <v-card class="login-card">
     <v-card-title>Wybierz bazę danych</v-card-title>
     <v-divider></v-divider>
-    <v-list>
+    <v-list v-if="!fetchingDatabases">
       <v-list-item
         v-for="database in databases"
         :key="database.id"
@@ -11,11 +11,13 @@
         >{{ database.name }}</v-list-item
       >
     </v-list>
+    <v-skeleton-loader v-else type="list-item@3" />
   </v-card>
 </template>
 
 <script setup lang="ts">
 import type DatabaseInterface from '~/features/database/interfaces/DatabaseInterface'
+import type DatabasesInterface from '~/features/database/interfaces/DatabasesInterface'
 
 definePageMeta({
   middleware: ['database-not-selected-middleware'],
@@ -23,18 +25,25 @@ definePageMeta({
 })
 const databaseStore = useDatabaseStore()
 const databases = ref<Array<DatabaseInterface>>([])
-const router = useRouter()
+const fetchingDatabases = ref<boolean>(true)
 
 const selectDatabase = (selectedDatabase: DatabaseInterface) => {
-  databaseStore.id = selectedDatabase.id
-  databaseStore.name = selectedDatabase.name
-  router.push('/lineage')
+  databaseStore.selectDatabase(selectedDatabase)
 }
 
-setTimeout(async () => {
-  const response = await $fetch('http://localhost:8000/list_database_ids')
-  databases.value = response.databases
-})
+const fetchDatabases = async () => {
+  fetchingDatabases.value = true
+  try {
+    const data = await useApiFetch<DatabasesInterface>('/list_database_ids')
+    databases.value = data.databases
+  } catch {
+    databases.value = []
+  } finally {
+    fetchingDatabases.value = false
+  }
+}
+
+fetchDatabases()
 </script>
 
 <style lang="scss" scoped>
