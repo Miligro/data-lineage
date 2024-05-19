@@ -29,9 +29,9 @@ export default defineNuxtConfig({
   hooks: {
     'pages:extend'(pages) {
       pages.push({
-        name: 'select-database',
+        name: 'databases',
         path: '/',
-        file: '~/pages/select-database.vue',
+        file: '~/pages/databases/index.vue',
       })
     },
   },

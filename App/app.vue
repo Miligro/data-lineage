@@ -6,13 +6,6 @@
   </div>
 </template>
 
-<script lang="ts" setup>
-onMounted(() => {
-  const databaseStore = useDatabaseStore()
-  databaseStore.loadDatabase()
-})
-</script>
-
 <style lang="scss">
 #app {
   min-height: 100vh;

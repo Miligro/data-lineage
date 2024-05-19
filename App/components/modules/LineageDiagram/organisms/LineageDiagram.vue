@@ -20,12 +20,23 @@ import nodeHtmlLabel from 'cytoscape-node-html-label'
 
 nodeHtmlLabel(cytoscape)
 
+const props = defineProps({
+  databaseId: {
+    type: String,
+    required: true,
+  },
+  objectId: {
+    type: String,
+    required: true,
+  },
+})
+
 const cyContainer = ref<HTMLElement | null>(null)
 const zoomLevel = ref(1.0)
 
-const databaseStore = useDatabaseStore()
-
-const response = await useApiFetch(`/databases/${databaseStore.id}/objects/498/relationships`)
+const response = await useApiFetch(
+  `/databases/${props.databaseId}/objects/${props.objectId}/relationships`
+)
 
 onMounted(() => {
   if (!cyContainer.value) return
@@ -132,7 +143,7 @@ onMounted(() => {
   position: relative;
   height: 100%;
   width: 100%;
-  box-shadow: 0 0 10px 0 rgba(0, 0, 0, 1);
+  box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.49);
 }
 
 .cy-container {
