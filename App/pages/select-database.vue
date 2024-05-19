@@ -34,7 +34,7 @@ const selectDatabase = (selectedDatabase: DatabaseInterface) => {
 const fetchDatabases = async () => {
   fetchingDatabases.value = true
   try {
-    const data = await useApiFetch<DatabasesInterface>('/list_database_ids')
+    const data = await useApiFetch<DatabasesInterface>('/databases')
     databases.value = data.databases
   } catch {
     databases.value = []

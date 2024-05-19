@@ -25,14 +25,14 @@ const zoomLevel = ref(1.0)
 
 const databaseStore = useDatabaseStore()
 
-const response = await useApiFetch(`/get_lineage_info/${databaseStore.id}`)
+const response = await useApiFetch(`/databases/${databaseStore.id}/objects/498/relationships`)
 
 onMounted(() => {
   if (!cyContainer.value) return
 
   const cy = cytoscape({
     container: cyContainer.value,
-    elements: [...response.nodes, ...response.edges],
+    elements: response.relationships,
     style: [
       {
         selector: 'node',

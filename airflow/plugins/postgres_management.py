@@ -43,20 +43,21 @@ class PostgresDatabaseManagement:
         with self.conn.cursor() as cur:
             cur.execute("""
                 SELECT
-                    tc.constraint_name,
                     tc.table_schema,
-                    tc.table_name,
-                    kcu.column_name,
-                    tc.constraint_type
-                FROM 
-                    information_schema.table_constraints AS tc 
-                    JOIN information_schema.key_column_usage AS kcu 
-                    ON tc.constraint_name = kcu.constraint_name
-                    AND tc.table_schema = kcu.table_schema
-                WHERE
-                    tc.constraint_type IN ('PRIMARY KEY', 'FOREIGN KEY', 'UNIQUE')
-                    AND tc.table_schema NOT IN ('information_schema', 'pg_catalog');
-            """)
+                    tc.table_name AS referencing_table,
+                    kcu.column_name AS referencing_column,
+                    ccu.table_name AS referenced_table,
+                    ccu.column_name AS referenced_column
+                FROM
+                    information_schema.table_constraints AS tc
+                    JOIN information_schema.key_column_usage AS kcu
+                      ON tc.constraint_name = kcu.constraint_name
+                      AND tc.table_schema = kcu.table_schema
+                    JOIN information_schema.constraint_column_usage AS ccu
+                      ON ccu.constraint_name = tc.constraint_name
+                      AND ccu.table_schema = tc.table_schema
+                WHERE tc.constraint_type = 'FOREIGN KEY';
+                """)
             return cur.fetchall()
 
     def fetch_view_dependencies(self):
