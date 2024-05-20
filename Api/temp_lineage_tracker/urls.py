@@ -21,5 +21,6 @@ urlpatterns = [
     path('databases/', views.ListDatabasesView.as_view(), name='databases'),
     path('databases/<str:database_id>/objects/', views.ListObjectsView.as_view(), name='objects'),
     path('databases/<str:database_id>/objects/<str:object_id>/relationships/',
-         views.ListObjectRelationshipsView.as_view(), name='relationships')
+         views.ListObjectRelationshipsView.as_view(), name='relationships'),
+    path('model/', views.LineageModelView.as_view(), name='lineage_model'),
 ]

@@ -111,9 +111,8 @@ true_relationships = {
 def predict_relationships(model, X_test, pairs):
     predictions = []
     for index, x in enumerate(X_test):
-        prediction = model.predict([[x[0], x[1]]])[0]
-        if prediction:
-            predictions.append(pairs[index])
+        probability = model.predict_proba([[x[0], x[1]]])[0][1]
+        predictions.append((pairs[index], probability))
     return predictions
 
 def visualize_relationships(predicted_relationships):
@@ -213,11 +212,12 @@ class ModelManager:
             return pickle.load(f)
     
 
-# manager = ModelManager()
-# X_test, pairs_test = manager.train_model(true_relationships)
-# manager.save_model('Api/temp_lineage_tracker/lineage_ml/models/forest.pkl')
+manager = ModelManager()
+X_test, pairs_test = manager.train_model(true_relationships)
+manager.save_model('models/forest.pkl')
 
-# predicted_relationships = predict_relationships(manager.model, X_test, pairs_test)
+predicted_relationships = predict_relationships(manager.model, X_test, pairs_test)
+print(predicted_relationships)
 # visualize_relationships(predicted_relationships)
 
 # loaded_model = ModelManager.load_model('Api/temp_lineage_tracker/lineage_ml/models/forest.pkl')

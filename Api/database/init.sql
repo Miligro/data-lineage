@@ -7,7 +7,7 @@ CREATE TABLE objects (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     database_id INT NOT NULL,
-    FOREIGN KEY (database_id) REFERENCES databases(id)
+    FOREIGN KEY (database_id) REFERENCES databases(id) ON DELETE CASCADE
 );
 
 CREATE TABLE object_relationships (
@@ -16,9 +16,9 @@ CREATE TABLE object_relationships (
     source_object_id INT NOT NULL,
     target_object_id INT NOT NULL,
     connection_probability FLOAT CHECK (connection_probability >= 0 AND connection_probability <= 1),
-    FOREIGN KEY (database_id) REFERENCES databases(id),
-    FOREIGN KEY (source_object_id) REFERENCES objects(id),
-    FOREIGN KEY (target_object_id) REFERENCES objects(id),
+    FOREIGN KEY (database_id) REFERENCES databases(id) ON DELETE CASCADE,
+    FOREIGN KEY (source_object_id) REFERENCES objects(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_object_id) REFERENCES objects(id) ON DELETE CASCADE,
     UNIQUE (database_id, source_object_id, target_object_id)
 );
 
@@ -28,7 +28,7 @@ CREATE TABLE object_details (
     object_id INT NOT NULL,
     column_name VARCHAR(255) NOT NULL,
     column_type VARCHAR(255) NOT NULL,
-    FOREIGN KEY (database_id) REFERENCES databases(id),
-    FOREIGN KEY (object_id) REFERENCES objects(id),
+    FOREIGN KEY (database_id) REFERENCES databases(id) ON DELETE CASCADE,
+    FOREIGN KEY (object_id) REFERENCES objects(id) ON DELETE CASCADE,
     UNIQUE (database_id, object_id, column_name)
 );
