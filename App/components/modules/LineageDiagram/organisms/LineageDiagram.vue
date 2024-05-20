@@ -63,6 +63,11 @@ onMounted(() => {
           'target-arrow-shape': 'triangle',
           'curve-style': 'bezier',
           'arrow-scale': 1.5,
+          label: 'data(connection_probability)', // Używamy danych etykiet
+          'text-rotation': 'autorotate',
+          'text-margin-y': -10,
+          'font-size': 24,
+          color: '#000',
         },
       },
       {
