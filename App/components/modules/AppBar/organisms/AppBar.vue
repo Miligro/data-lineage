@@ -1,18 +1,28 @@
 <template>
   <v-app-bar color="blue-lighten-1">
-    <v-app-bar-title>Lineage: {{ databaseStore.name }}</v-app-bar-title>
-    <v-spacer></v-spacer>
-    <v-btn :icon="true" @click="databaseStore.logout()">
+    <v-app-bar-title class="toolbar-title">Lineage</v-app-bar-title>
+    <v-divider vertical class="divider"></v-divider>
+    <v-btn :icon="true" @click="redirectToDatabasesList">
+      <v-tooltip activator="parent">Lista baz danych</v-tooltip>
       <v-icon>mdi-format-list-group</v-icon>
-    </v-btn>
-    <v-btn :icon="true" @click="databaseStore.logout()">
-      <v-icon>mdi-power</v-icon>
     </v-btn>
   </v-app-bar>
 </template>
 
 <script lang="ts" setup>
-const databaseStore = useDatabaseStore()
+const router = useRouter()
+
+const redirectToDatabasesList = () => {
+  router.push(`/`)
+}
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.toolbar-title {
+  flex: unset;
+}
+
+.divider {
+  margin: 0 1rem;
+}
+</style>

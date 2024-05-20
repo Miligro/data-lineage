@@ -20,19 +20,30 @@ import nodeHtmlLabel from 'cytoscape-node-html-label'
 
 nodeHtmlLabel(cytoscape)
 
+const props = defineProps({
+  databaseId: {
+    type: String,
+    required: true,
+  },
+  objectId: {
+    type: String,
+    required: true,
+  },
+})
+
 const cyContainer = ref<HTMLElement | null>(null)
 const zoomLevel = ref(1.0)
 
-const databaseStore = useDatabaseStore()
-
-const response = await useApiFetch(`/get_lineage_info/${databaseStore.id}`)
+const response = await useApiFetch(
+  `/databases/${props.databaseId}/objects/${props.objectId}/relationships`
+)
 
 onMounted(() => {
   if (!cyContainer.value) return
 
   const cy = cytoscape({
     container: cyContainer.value,
-    elements: [...response.nodes, ...response.edges],
+    elements: response.relationships,
     style: [
       {
         selector: 'node',
@@ -52,6 +63,11 @@ onMounted(() => {
           'target-arrow-shape': 'triangle',
           'curve-style': 'bezier',
           'arrow-scale': 1.5,
+          label: 'data(connection_probability)', // Używamy danych etykiet
+          'text-rotation': 'autorotate',
+          'text-margin-y': -10,
+          'font-size': 24,
+          color: '#000',
         },
       },
       {
@@ -132,7 +148,7 @@ onMounted(() => {
   position: relative;
   height: 100%;
   width: 100%;
-  box-shadow: 0 0 10px 0 rgba(0, 0, 0, 1);
+  box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.49);
 }
 
 .cy-container {

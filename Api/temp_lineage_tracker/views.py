@@ -1,141 +1,89 @@
-import json
+from django.shortcuts import get_object_or_404
 from django.views import View
-from django.conf import settings
 from django.http import JsonResponse
-
-from airflow.DatabasesManagement.related_objects_extractor import SQLParser
-from airflow.DatabasesManagement.oracle_management import OracleDatabaseManagement
-from airflow.DatabasesManagement.postgres_management import PostgresDatabaseManagement
-from airflow.DatabasesManagement.sqlserver_management import SQLServerDatabaseManagement
 from .lineage_ml.model import ModelManager
+from django.db import models
+from .models import Database, Object, ObjectRelationship
 
 
-def get_database_connection(db_name):
-    db_settings = settings.DATABASES[db_name]
-    host = db_settings['HOST']
-    dbname = db_settings['NAME']
-    user = db_settings['USER']
-    port = db_settings['PORT']
-    password = db_settings['PASSWORD']
-
-    if db_settings['ENGINE'] == 'django.db.backends.postgresql':
-        return PostgresDatabaseManagement(host=host, dbname=dbname, user=user, password=password, port=port)
-    elif db_settings['ENGINE'] == 'django.db.backends.oracle':
-        return OracleDatabaseManagement(host=host, port=port, dbname=dbname, user=user, password=password)
-    elif db_settings['ENGINE'] == 'mssql':
-        return SQLServerDatabaseManagement(server=host, database=dbname, username=user, password=password, port=port)
-
-
-class BaseDatabaseView(View):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.postgres_db = get_database_connection("postgres")
-        # self.oracle_db = get_database_connection("oracle")
-        self.sql_server_db = get_database_connection("sqlserver")
-        self.connect_to_databases()
-
-    def connect_to_databases(self):
-        self.postgres_db.connect()
-        # self.oracle_db.connect()
-        self.sql_server_db.connect()
-
-
-class ListDatabasesView(BaseDatabaseView):
-    def get(self, _):
-        database_ids = {
+class ListDatabasesView(View):
+    def get(self, request):
+        databases = Database.objects.all()
+        databases_dict = {
             'databases': [
-            {
-                'id': 'POS01',
-                'name': 'Postgres'
+                {'id': db.id, 'name': db.name} for db in databases
+            ]
+        }
+        return JsonResponse(databases_dict)
+
+
+class ListObjectsView(View):
+    def get(self, request, database_id):
+        print(database_id)
+        database = get_object_or_404(Database, id=database_id)
+        objects = Object.objects.filter(database=database)
+        response_data = {
+            'database': {
+                'id': database.id,
+                'name': database.name
             },
-            {
-                'id': 'ORA02',
-                'name': 'Oracle'
+            'objects': [
+                {
+                    'id': obj.id,
+                    'name': obj.name
+                } for obj in objects
+            ]
+        }
+
+        return JsonResponse(response_data)
+
+
+class ListObjectRelationshipsView(View):
+    def get(self, request, database_id, object_id):
+        database = get_object_or_404(Database, id=database_id)
+        obj = get_object_or_404(Object, database=database, id=object_id)
+
+        relationships = ObjectRelationship.objects.filter(database=database).filter(
+            models.Q(source_object=obj) | models.Q(target_object=obj)
+        )
+
+        objects_set = set()
+        for relationship in relationships:
+            objects_set.add((relationship.source_object.id,relationship.source_object.name))
+            objects_set.add((relationship.target_object.id,relationship.target_object.name))
+
+        response_data = {
+            'database': {
+                'id': database.id,
+                'name': database.name
             },
-            {
-                'id': 'SRV03',
-                'name': 'SQL Server'
+            'object': {
+                'id': obj.id,
+                'name': obj.name
             },
-        ]}
-        return JsonResponse(database_ids)
+            'relationships': [
+                {
+                    'data': {
+                        'id': f'{rel.source_object.id}-{rel.target_object.id}',
+                        'source': rel.source_object.id,
+                        'target': rel.target_object.id,
+                        'connection_probability': rel.connection_probability
+                    },
+                } for rel in relationships
+            ]
+            + [
+                {
+                    'data': {
+                        'id': object_t[0],
+                        'label': object_t[1]
+                    }
+                } for object_t in objects_set
+            ]
+        }
+        return JsonResponse(response_data)
 
 
-def convert_to_json(columns, constraints, views, procedures, functions):
-    tables_names = []
-    nodes_json = []
-    edges_json = []
-
-    for constraint in constraints:
-        if constraint[4] == 'FOREIGN KEY' or constraint[4] == 'R':
-            source = constraint[2]
-            target = constraint[3].split('_')[0]
-
-            if source not in tables_names:
-                tables_names.append(source)
-
-            if target not in tables_names:
-                tables_names.append(target)
-
-            edge_id = f"{source}_{target}"
-            edges_json.append({"data": {"id": edge_id, "source": source, "target": target}})
-
-    for view in views:
-        source_view = view[1]
-        target_table = view[3]
-
-        if source_view not in tables_names:
-            tables_names.append(source_view)
-
-        if target_table not in tables_names:
-            tables_names.append(target_table)
-
-        edge_id = f"{target_table}_{source_view}"
-        edges_json.append({"data": {"id": edge_id, "source": target_table, "target": source_view}})
-
-    for procedure in procedures + functions:
-        procedure_name = procedure[1]
-        parser = SQLParser(procedure[3])
-        objects = parser.extract_related_objects()
-        for obj in objects:
-            if obj != procedure_name:
-                if procedure_name not in tables_names:
-                    tables_names.append(procedure_name)
-
-                if obj not in tables_names:
-                    tables_names.append(obj)
-
-                edge_id = f"{procedure_name}_{obj}"
-                edges_json.append({"data": {"id": edge_id, "source": procedure_name, "target": obj}})
-
-    for table_name in tables_names:
-        nodes_json.append({"data": {"id": table_name, "label": table_name}})
-
-    return json.dumps({"nodes": nodes_json, "edges": edges_json}, indent=4)
-
-
-def process_lineage(db_metadata):
-    columns = db_metadata.fetch_table_metadata()
-    constraints = db_metadata.fetch_table_constraints()
-    views = db_metadata.fetch_view_dependencies()
-    procedures = db_metadata.fetch_stored_procedures()
-    functions = db_metadata.fetch_stored_functions()
-
-    return convert_to_json(columns, constraints, views, procedures, functions)
-    
-
-class ProcessLineageView(BaseDatabaseView):
-    def get(self, _, database_id):
-        if database_id == 'POS01':
-            return JsonResponse(json.loads(process_lineage(self.postgres_db)))
-        elif database_id == 'ORA02':
-            return JsonResponse(json.loads(process_lineage(self.oracle_db)))
-        elif database_id == 'SRV03':
-            return JsonResponse(json.loads(process_lineage(self.sql_server_db)))
-        else:
-            return JsonResponse({'error': 'Invalid database ID'}, status=400)
-
-
-class LineageModelView(BaseDatabaseView):
+class LineageModelView(View):
     def post(self, _, database_id):
         # TODO
         loaded_model = ModelManager.load_model('Api/temp_lineage_tracker/lineage_ml/models/forest.pkl')

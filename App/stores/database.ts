@@ -25,7 +25,7 @@ export const useDatabaseStore = defineStore('database', {
         this.id = parsedDatabase.id
         this.name = parsedDatabase.name
         if (route.path === '/') {
-          router.replace('/lineage')
+          router.replace(`/databases/${this.id}/objects`)
         }
       } else {
         router.push('/')
