@@ -1,3 +1,5 @@
+from itertools import permutations
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime
@@ -5,7 +7,9 @@ from sqlalchemy import create_engine, MetaData, Table
 from sqlalchemy.orm import sessionmaker
 from postgres_management import PostgresDatabaseManagement
 from related_objects_extractor import SQLParser
+from model import *
 import pandas as pd
+import numpy as np
 
 
 DB_HOST = 'postgres-data-lineage-postgres-1'
@@ -63,6 +67,67 @@ def fetch_relationships(ti):
     #             edge_id = f"{procedure_name}_{obj}"
     #             relationships.append({"source": procedure_name, "target": obj})
     ti.xcom_push(key='relationships', value=relationships)
+
+
+def fetch_relationships_by_model():
+    db_manager = PostgresDatabaseManagement(DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_PORT)
+    db_manager.connect()
+
+    metadata = db_manager.fetch_metadata_for_model()
+    table_names = metadata['table_name'].unique()
+    pairs = list(permutations(table_names, 2))
+    table_name_similarities = analyze_table_names(metadata)
+    column_name_similarities = analyze_column_names(metadata)
+    model = load_model('/opt/airflow/plugins/forest.pkl')
+
+    X_pred = []
+    for pair in pairs:
+        idx1 = table_name_similarities.index.get_loc(pair[0])
+        idx2 = table_name_similarities.columns.get_loc(pair[1])
+        name_similarity = table_name_similarities.iloc[idx1, idx2]
+        columns_similarity = column_name_similarities.iloc[idx1, idx2]
+        X_pred.append([name_similarity, columns_similarity])
+
+    predicts = predict_relationships(model, np.array(X_pred), pairs)
+
+    # By GPT
+    engine = create_engine(
+        f'postgresql+psycopg2://{DJANGO_DB_USER}:{DJANGO_DB_PASSWORD}@{DJANGO_DB_HOST}:{DJANGO_DB_PORT}/{DJANGO_DB_NAME}')
+    session = sessionmaker(bind=engine)()
+
+    existing_relationships = pd.read_sql_table('object_relationships', engine)
+    existing_relationships_set = set(zip(
+        existing_relationships['source_object_id'],
+        existing_relationships['target_object_id']
+    ))
+
+    objects_df = pd.read_sql_table('objects', engine)
+    object_id_map = objects_df.set_index('name')['id'].to_dict()
+
+    new_relationships = []
+    for (source, target), probability in predicts:
+        if probability > 0.0:
+            source_id = object_id_map.get(source)
+            target_id = object_id_map.get(target)
+            if source_id is None or target_id is None:
+                continue
+            if (source_id, target_id) not in existing_relationships_set:
+                new_relationships.append({
+                    'database_id': 1,
+                    'source_object_id': source_id,
+                    'target_object_id': target_id,
+                    'connection_probability': probability
+                })
+
+    if new_relationships:
+        metadata_obj = MetaData(bind=engine)
+        metadata_obj.reflect(only=['object_relationships'])
+        relationships_table = Table('object_relationships', metadata_obj, autoload_with=engine)
+
+        with engine.begin() as connection:
+            connection.execute(relationships_table.insert(), new_relationships)
+
+    session.close()
 
 
 def load_objects_to_django(ti):
@@ -173,4 +238,10 @@ with DAG(
         provide_context=True
     )
 
-    fetch_objects_task >> load_objects_task >> fetch_relationships_task >> load_relationships_task
+    fetch_relationships_by_model_task = PythonOperator(
+        task_id='fetch_relationships_by_model',
+        python_callable=fetch_relationships_by_model,
+        provide_context=True
+    )
+
+    fetch_objects_task >> load_objects_task >> fetch_relationships_task >> load_relationships_task >> fetch_relationships_by_model_task
