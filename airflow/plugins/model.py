@@ -6,25 +6,21 @@ from Levenshtein import distance as levenshtein_distance
 
 def analyze_table_names(metadata):
     table_names = metadata['table_name'].unique()
-    n = len(table_names)
-    levenshtein_matrix = [[0] * n for _ in range(n)]
-    for i in range(n):
-        for j in range(n):
-            if i != j:
-                levenshtein_matrix[i][j] = levenshtein_distance(table_names[i], table_names[j])
-    return pd.DataFrame(levenshtein_matrix, index=table_names, columns=table_names)
+    names_lengths = [len(name) for name in table_names]
+
+    return pd.Series(names_lengths, index=table_names)
 
 
 def analyze_column_names(metadata):
     similarities = defaultdict(dict)
     tables = metadata['table_name'].unique()
     for table in tables:
-        table_columns = metadata[metadata['table_name'] == table][['column_name', 'data_type']]
+        table_columns = metadata[metadata['table_name'] == table][['column_name', 'data_type', 'oid']]
         for other_table in tables:
             if table == other_table:
                 similarities[table][other_table] = 1.0
                 continue
-            other_table_columns = metadata[metadata['table_name'] == other_table][['column_name', 'data_type']]
+            other_table_columns = metadata[metadata['table_name'] == other_table][['column_name', 'data_type', 'oid']]
             total_similarity = 0
             comparisons = 0
             for col in table_columns['column_name']:
@@ -40,10 +36,13 @@ def analyze_column_names(metadata):
 def predict_relationships(model, X_test, pairs):
     predictions = []
     for index, x in enumerate(X_test):
-        probability = model.predict_proba([[x[0], x[1]]])[0][1]
+        probability = model.predict_proba([x])[0][1]
         predictions.append((pairs[index], probability))
     return predictions
 
+def analyze_data_type(metadata):
+    data_type_counts = metadata.groupby(['table_name', 'data_type']).size().unstack(fill_value=0)
+    return data_type_counts
 
 def load_model(filepath):
     with open(filepath, 'rb') as f:

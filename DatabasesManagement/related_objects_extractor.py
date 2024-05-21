@@ -57,19 +57,3 @@ class SQLParser:
             stream = self._extract_from_part(query)
             results.extend(list(self._extract_identifiers(stream)))
         return results
-
-query = """
-DECLARE
-    v_new_user_id INT;
-BEGIN
-    INSERT INTO users (first_name, last_name, email, password, registration_date)
-    VALUES (p_first_name, p_last_name, p_email, p_password, CURRENT_DATE)
-    RETURNING user_id INTO v_new_user_id;
-
-    CALL create_cart_for_user(v_new_user_id);
-END;
-"""
-
-parser = SQLParser(sql=query)
-results = parser.extract_related_objects()
-print(results)

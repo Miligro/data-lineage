@@ -10,6 +10,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from Levenshtein import distance as levenshtein_distance
+from sklearn.preprocessing import LabelEncoder
 
 
 true_relationships = {
@@ -126,39 +127,46 @@ def visualize_relationships(predicted_relationships):
 
 
 class ModelManager:
-    def __init__(self, database_uri='postgresql+psycopg2://postgres:postgres@localhost:5432/online_store'):
+    def __init__(self, database_uri='postgresql+psycopg2://postgres:postgres@localhost:5433/online_store'):
         self.database_uri = database_uri
         self.engine = create_engine(database_uri)
         self.model = None
 
     def _get_metadata(self):
         query = """
-            SELECT table_name, column_name, data_type
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
+            SELECT
+                cols.table_name as table_name,
+                cols.column_name as column_name,
+                cols.data_type as data_type,
+                cls.oid as oid
+            FROM
+                information_schema.columns AS cols
+            JOIN
+                pg_class AS cls
+            ON
+                cols.table_name = cls.relname
+            WHERE
+                cols.table_schema NOT IN ('information_schema', 'pg_catalog');
         """
-        return pd.read_sql(query, self.engine)
+        with self.engine.connect() as connection:
+            return pd.read_sql(query, con=connection.connection)
 
     def _analyze_table_names(self, metadata):
         table_names = metadata['table_name'].unique()
-        n = len(table_names)
-        levenshtein_matrix = [[0] * n for _ in range(n)]
-        for i in range(n):
-            for j in range(n):
-                if i != j:
-                    levenshtein_matrix[i][j] = levenshtein_distance(table_names[i], table_names[j])
-        return pd.DataFrame(levenshtein_matrix, index=table_names, columns=table_names)
+        names_lengths = [len(name) for name in table_names]
+
+        return pd.Series(names_lengths, index=table_names)
 
     def _analyze_column_names(self, metadata):
         similarities = defaultdict(dict)
         tables = metadata['table_name'].unique()
         for table in tables:
-            table_columns = metadata[metadata['table_name'] == table][['column_name', 'data_type']]
+            table_columns = metadata[metadata['table_name'] == table][['column_name', 'data_type', 'oid']]
             for other_table in tables:
                 if table == other_table:
                     similarities[table][other_table] = 1.0
                     continue
-                other_table_columns = metadata[metadata['table_name'] == other_table][['column_name', 'data_type']]
+                other_table_columns = metadata[metadata['table_name'] == other_table][['column_name', 'data_type', 'oid']]
                 total_similarity = 0
                 comparisons = 0
                 for col in table_columns['column_name']:
@@ -170,27 +178,35 @@ class ModelManager:
                 similarities[table][other_table] = normalized_similarity
         return pd.DataFrame(similarities)
 
-    def _prepare_training_data(self, metadata, name_similarities, columns_similarities, true_relationships):
+
+    def _analyze_data_type(self, metadata):
+        data_type_counts = metadata.groupby(['table_name', 'data_type']).size().unstack(fill_value=0)
+        return data_type_counts
+
+    def _prepare_training_data(self, metadata, name_lengths, columns_similarities, data_type_counts,
+                               true_relationships):
         X = []
         y = []
         table_names = metadata['table_name'].unique()
         pairs = list(permutations(table_names, 2))
         for pair in pairs:
             label = true_relationships.get(pair, 0)
-            idx1 = name_similarities.index.get_loc(pair[0])
-            idx2 = name_similarities.columns.get_loc(pair[1])
-            name_similarity = name_similarities.iloc[idx1, idx2]
+            idx1 = columns_similarities.index.get_loc(pair[0])
+            idx2 = columns_similarities.columns.get_loc(pair[1])
+            name_distance = name_lengths.iloc[idx1] - name_lengths.iloc[idx2]
             columns_similarity = columns_similarities.iloc[idx1, idx2]
-            X.append([name_similarity, columns_similarity])
+            data_types_diffs = abs(data_type_counts.loc[pair[0]] - data_type_counts.loc[pair[1]])
+            X.append([name_distance, columns_similarity] + data_types_diffs.tolist())
             y.append(label)
         return np.array(X), np.array(y), pairs
 
     def train_model(self, true_relationships):
         metadata = self._get_metadata()
-        table_name_similarities = self._analyze_table_names(metadata)
+        table_name_lengths = self._analyze_table_names(metadata)
         table_columns_similarities = self._analyze_column_names(metadata)
-        X, y, pairs = self._prepare_training_data(metadata, table_name_similarities, table_columns_similarities,
-                                              true_relationships)
+        data_type_counts = self._analyze_data_type(metadata)
+        X, y, pairs = self._prepare_training_data(metadata, table_name_lengths, table_columns_similarities,
+                                                  data_type_counts, true_relationships)
         X_train, X_test, y_train, y_test, _, pairs_test = train_test_split(X, y, pairs, test_size=0.3, random_state=42)
         self.model = RandomForestClassifier()
         self.model.fit(X_train, y_train)
@@ -216,8 +232,8 @@ manager = ModelManager()
 X_test, pairs_test = manager.train_model(true_relationships)
 manager.save_model('models/forest.pkl')
 
-predicted_relationships = predict_relationships(manager.model, X_test, pairs_test)
-print(predicted_relationships)
+# predicted_relationships = predict_relationships(manager.model, X_test, pairs_test)
+# print(predicted_relationships)
 # visualize_relationships(predicted_relationships)
 
 # loaded_model = ModelManager.load_model('Api/temp_lineage_tracker/lineage_ml/models/forest.pkl')

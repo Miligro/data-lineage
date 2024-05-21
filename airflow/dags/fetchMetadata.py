@@ -11,8 +11,8 @@ from model import *
 import pandas as pd
 import numpy as np
 
-DB_HOST = 'postgres-data-lineage-postgres-1'
-DB_NAME = 'online_store'
+DB_HOST = 'lineage-databases-test-database-1'
+DB_NAME = 'healthcare'
 DB_USER = 'postgres'
 DB_PASSWORD = 'postgres'
 DB_PORT = 5432
@@ -92,17 +92,19 @@ def fetch_relationships_by_model():
     metadata = db_manager.fetch_metadata_for_model()
     table_names = metadata['table_name'].unique()
     pairs = list(permutations(table_names, 2))
-    table_name_similarities = analyze_table_names(metadata)
+    table_name_lengths = analyze_table_names(metadata)
     column_name_similarities = analyze_column_names(metadata)
+    data_type_counts = analyze_data_type(metadata)
     model = load_model('/opt/airflow/plugins/forest.pkl')
 
     X_pred = []
     for pair in pairs:
-        idx1 = table_name_similarities.index.get_loc(pair[0])
-        idx2 = table_name_similarities.columns.get_loc(pair[1])
-        name_similarity = table_name_similarities.iloc[idx1, idx2]
+        idx1 = column_name_similarities.index.get_loc(pair[0])
+        idx2 = column_name_similarities.columns.get_loc(pair[1])
+        name_distance = table_name_lengths.iloc[idx1] - table_name_lengths.iloc[idx2]
         columns_similarity = column_name_similarities.iloc[idx1, idx2]
-        X_pred.append([name_similarity, columns_similarity])
+        data_types_diffs = (abs(data_type_counts.loc[pair[0]] - data_type_counts.loc[pair[1]])).tolist()
+        X_pred.append([name_distance, columns_similarity] + data_types_diffs)
 
     predicts = predict_relationships(model, np.array(X_pred), pairs)
 
@@ -192,7 +194,7 @@ def load_relationships_to_django(ti):
         source_id = object_id_map.get(source_name)
         target_id = object_id_map.get(target_name)
         if source_id is None or target_id is None:
-            raise ValueError(f"Object ID not found for source: {source_name} or target: {target_name}")
+            continue
 
         unique_relationships.add((
             database_id,

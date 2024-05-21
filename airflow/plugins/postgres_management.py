@@ -41,7 +41,6 @@ class PostgresDatabaseManagement:
         result = self.engine.execute(query).fetchall()
         return result
 
-
     def fetch_table_constraints(self):
         query = """
         SELECT
@@ -112,9 +111,19 @@ class PostgresDatabaseManagement:
 
     def fetch_metadata_for_model(self):
         query = """
-        SELECT table_name, column_name, data_type
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
+            SELECT
+                cols.table_name,
+                cols.column_name,
+                cols.data_type,
+                cls.oid
+            FROM
+                information_schema.columns AS cols
+            JOIN
+                pg_class AS cls
+            ON
+                cols.table_name = cls.relname
+            WHERE
+                cols.table_schema NOT IN ('information_schema', 'pg_catalog');
         """
         result = self.engine.execute(query).fetchall()
-        return pd.DataFrame(result, columns=['table_name', 'column_name', 'data_type'])
+        return pd.DataFrame(result, columns=['table_name', 'column_name', 'data_type', 'oid'])
