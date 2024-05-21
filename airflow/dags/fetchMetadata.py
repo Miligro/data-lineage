@@ -11,7 +11,6 @@ from model import *
 import pandas as pd
 import numpy as np
 
-
 DB_HOST = 'postgres-data-lineage-postgres-1'
 DB_NAME = 'online_store'
 DB_USER = 'postgres'
@@ -25,14 +24,33 @@ DJANGO_DB_PASSWORD = 'postgres'
 DJANGO_DB_PORT = 5432
 
 
+def update_status_to_django(status, database_id, **context):
+    engine = create_engine(
+        f'postgresql+psycopg2://{DJANGO_DB_USER}:{DJANGO_DB_PASSWORD}@{DJANGO_DB_HOST}:{DJANGO_DB_PORT}/{DJANGO_DB_NAME}')
+
+    session = sessionmaker(bind=engine)()
+    metadata_obj = MetaData(bind=engine)
+    metadata_obj.reflect(only=['databases'])
+    databases_table = Table('databases', metadata_obj, autoload_with=engine)
+
+    with engine.begin() as connection:
+        connection.execute(
+            databases_table.update().values(ingest_status=status).where(databases_table.c.id == database_id))
+
+    session.close()
+
+
 def fetch_objects(ti):
     db_manager = PostgresDatabaseManagement(DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_PORT)
     db_manager.connect()
 
     metadata = db_manager.fetch_table_metadata()
+    procedures = db_manager.fetch_stored_procedures()
+    functions = db_manager.fetch_stored_functions()
     db_manager.close()
 
-    object_names = list({row[0] for row in metadata})
+    object_names = (list({row[0] for row in metadata}) + list({row[1] for row in procedures})
+                    + list({row[1] for row in functions}))
 
     ti.xcom_push(key='object_names', value=object_names)
 
@@ -43,8 +61,8 @@ def fetch_relationships(ti):
 
     constraints = db_manager.fetch_table_constraints()
     views = db_manager.fetch_view_dependencies()
-    # procedures = db_manager.fetch_stored_procedures()
-    # functions = db_manager.fetch_stored_functions()
+    procedures = db_manager.fetch_stored_procedures()
+    functions = db_manager.fetch_stored_functions()
     db_manager.close()
     relationships = []
 
@@ -57,15 +75,13 @@ def fetch_relationships(ti):
         target_table = view[3]
         relationships.append({"source": source_view, "target": target_table})
 
-    # for procedure in procedures + functions:
-    #     procedure_name = procedure[1]
-    #     parser = SQLParser(procedure[3])
-    #     objects = parser.extract_related_objects()
-    #     for obj in objects:
-    #         if obj != procedure_name:
-    #
-    #             edge_id = f"{procedure_name}_{obj}"
-    #             relationships.append({"source": procedure_name, "target": obj})
+    for procedure in procedures + functions:
+        procedure_name = procedure[1]
+        parser = SQLParser(procedure[3])
+        objects = parser.extract_related_objects()
+        for obj in objects:
+            if obj != procedure_name:
+                relationships.append({"source": procedure_name, "target": obj})
     ti.xcom_push(key='relationships', value=relationships)
 
 
@@ -90,7 +106,6 @@ def fetch_relationships_by_model():
 
     predicts = predict_relationships(model, np.array(X_pred), pairs)
 
-    # By GPT
     engine = create_engine(
         f'postgresql+psycopg2://{DJANGO_DB_USER}:{DJANGO_DB_PASSWORD}@{DJANGO_DB_HOST}:{DJANGO_DB_PORT}/{DJANGO_DB_NAME}')
     session = sessionmaker(bind=engine)()
@@ -207,13 +222,23 @@ def load_relationships_to_django(ti):
     session.close()
 
 
+def set_in_progress_status(**context):
+    update_status_to_django('in_progress', 1, **context)
+
+
+def set_final_status(**context):
+    task_instances = context['dag_run'].get_task_instances()
+    any_failed = any(ti.state == 'failed' for ti in task_instances if ti.task_id != 'set_final_status')
+    status = 'success' if not any_failed else 'failed'
+    update_status_to_django(status, 1, **context)
+
+
 with DAG(
         dag_id='postgres_to_django',
         start_date=datetime(2023, 1, 1),
         schedule_interval='@daily',
         catchup=False
 ) as dag:
-
     fetch_objects_task = PythonOperator(
         task_id='fetch_objects',
         python_callable=fetch_objects,
@@ -244,4 +269,17 @@ with DAG(
         provide_context=True
     )
 
-    fetch_objects_task >> load_objects_task >> fetch_relationships_task >> load_relationships_task >> fetch_relationships_by_model_task
+    set_in_progress_task = PythonOperator(
+        task_id='set_in_progress_status',
+        python_callable=set_in_progress_status,
+        provide_context=True
+    )
+
+    set_final_status_task = PythonOperator(
+        task_id='set_final_status',
+        python_callable=set_final_status,
+        trigger_rule='all_done',
+        provide_context=True
+    )
+
+    set_in_progress_task >> fetch_objects_task >> load_objects_task >> fetch_relationships_task >> load_relationships_task >> fetch_relationships_by_model_task >> set_final_status_task

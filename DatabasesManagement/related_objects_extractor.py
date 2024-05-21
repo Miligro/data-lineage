@@ -13,7 +13,7 @@ class SQLParser:
         for item in parsed.tokens:
             if item.is_group:
                 return self._is_subselect(item)
-            elif item.ttype is DML and item.value.upper() == 'SELECT':
+            elif item.ttype is DML and item.value.upper() in ['SELECT']:
                 return True
         return False
 
@@ -34,8 +34,12 @@ class SQLParser:
             if(token.is_group):
                 for result in self._extract_from_part(token):
                     yield result
-            if token.ttype is Keyword and token.value.upper() in ["FROM", "JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "EXEC", "EXECUTE", "CALL"]:
+            if token.ttype is Keyword and token.value.upper() in ["FROM", "JOIN", "INNER JOIN", "LEFT JOIN",
+                                                                  "RIGHT JOIN", "FULL JOIN", "EXEC", "EXECUTE", "CALL",
+                                                                  "INTO"]:
                 i += 1
+                if token.value.upper() == 'INTO' and parsed.tokens[i-3].value.upper() != 'INSERT':
+                    continue
                 while i < len(parsed.tokens) and (parsed.tokens[i].ttype is Whitespace or parsed.tokens[i].ttype is Punctuation):
                     i += 1
                 if i < len(parsed.tokens):
@@ -53,3 +57,19 @@ class SQLParser:
             stream = self._extract_from_part(query)
             results.extend(list(self._extract_identifiers(stream)))
         return results
+
+query = """
+DECLARE
+    v_new_user_id INT;
+BEGIN
+    INSERT INTO users (first_name, last_name, email, password, registration_date)
+    VALUES (p_first_name, p_last_name, p_email, p_password, CURRENT_DATE)
+    RETURNING user_id INTO v_new_user_id;
+
+    CALL create_cart_for_user(v_new_user_id);
+END;
+"""
+
+parser = SQLParser(sql=query)
+results = parser.extract_related_objects()
+print(results)

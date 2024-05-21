@@ -2,6 +2,7 @@ import sqlparse
 from sqlparse.tokens import DML, Keyword, Whitespace, Punctuation
 from sqlparse.sql import IdentifierList, Identifier, Function
 
+
 class SQLParser:
     def __init__(self, sql):
         formatted = sqlparse.format(sql, strip_whitespace=True)
@@ -31,12 +32,17 @@ class SQLParser:
         i = 0
         while i < len(parsed.tokens):
             token = parsed.tokens[i]
-            if(token.is_group):
+            if token.is_group:
                 for result in self._extract_from_part(token):
                     yield result
-            if token.ttype is Keyword and token.value.upper() in ["FROM", "JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "EXEC", "EXECUTE", "CALL"]:
+            if token.ttype is Keyword and token.value.upper() in ["FROM", "JOIN", "INNER JOIN", "LEFT JOIN",
+                                                                  "RIGHT JOIN", "FULL JOIN", "EXEC", "EXECUTE",
+                                                                  "CALL", "INTO"]:
                 i += 1
-                while i < len(parsed.tokens) and (parsed.tokens[i].ttype is Whitespace or parsed.tokens[i].ttype is Punctuation):
+                if token.value.upper() == 'INTO' and parsed.tokens[i - 3].value.upper() != 'INSERT':
+                    continue
+                while (i < len(parsed.tokens) and
+                       (parsed.tokens[i].ttype is Whitespace or parsed.tokens[i].ttype is Punctuation)):
                     i += 1
                 if i < len(parsed.tokens):
                     next_token = parsed.tokens[i]

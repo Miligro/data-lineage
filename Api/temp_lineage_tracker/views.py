@@ -11,7 +11,7 @@ class ListDatabasesView(View):
         databases = Database.objects.all()
         databases_dict = {
             'databases': [
-                {'id': db.id, 'name': db.name} for db in databases
+                {'id': db.id, 'name': db.name, 'ingest_status': db.ingest_status} for db in databases
             ]
         }
         return JsonResponse(databases_dict)
@@ -89,7 +89,7 @@ AIRFLOW_PASSWORD = 'airflow'
 
 
 class LineageModelView(View):
-    def post(self, _):
+    def post(self, _, database_id):
         url = AIRFLOW_URL.format(dag_id='postgres_to_django')
         auth = (AIRFLOW_USERNAME, AIRFLOW_PASSWORD)
         response = requests.post(url, auth=auth, json={})
@@ -99,7 +99,7 @@ class LineageModelView(View):
         else:
             return JsonResponse({'status': 'error', 'message': 'Failed to trigger DAG', 'details': response.json()})
 
-    def get(self, _):
+    def get(self, _, database_id):
         url = AIRFLOW_URL.format(dag_id='postgres_to_django')
         auth = (AIRFLOW_USERNAME, AIRFLOW_PASSWORD)
         response = requests.get(url, auth=auth)

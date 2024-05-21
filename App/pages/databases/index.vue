@@ -21,6 +21,10 @@
           key: 'name',
         },
         {
+          title: 'Status przepływu',
+          key: 'ingest_status',
+        },
+        {
           title: '',
           key: 'actions',
           width: '40',
@@ -33,14 +37,20 @@
       loading-text="Pobieranie danych"
     >
       <template #[`item.actions`]="{ item }">
-        <v-btn
-          variant="text"
-          :icon="true"
-          @click="redirectToObjectsList(item.id)"
-        >
-          <v-tooltip activator="parent">Lista obiektów</v-tooltip>
-          <v-icon>mdi-format-list-group</v-icon>
-        </v-btn>
+        <div class="d-flex">
+          <v-btn
+            variant="text"
+            :icon="true"
+            @click="redirectToObjectsList(item.id)"
+          >
+            <v-tooltip activator="parent">Lista obiektów</v-tooltip>
+            <v-icon>mdi-format-list-group</v-icon>
+          </v-btn>
+          <v-btn variant="text" :icon="true" @click="ingestData(item.id)">
+            <v-tooltip activator="parent">Zaciągnij dane</v-tooltip>
+            <v-icon>mdi-source-pull</v-icon>
+          </v-btn>
+        </div>
       </template>
     </v-data-table>
   </v-card>
@@ -69,6 +79,12 @@ const fetchDatabases = async () => {
 
 const redirectToObjectsList = (id: number | string) => {
   router.push(`/databases/${id}/objects`)
+}
+
+const ingestData = async (id: number | string) => {
+  try {
+    await useApiFetch(`/databases/${id}/ingest/`, { method: 'POST' })
+  } catch {}
 }
 
 fetchDatabases()

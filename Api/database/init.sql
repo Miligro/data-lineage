@@ -1,6 +1,7 @@
 CREATE TABLE databases (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL
+    name VARCHAR(255) NOT NULL,
+    ingest_status VARCHAR(50)
 );
 
 CREATE TABLE objects (
