@@ -10,7 +10,6 @@ from sklearn.metrics import accuracy_score
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from Levenshtein import distance as levenshtein_distance
-from sklearn.preprocessing import LabelEncoder
 
 
 true_relationships = {

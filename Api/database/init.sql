@@ -1,7 +1,13 @@
+CREATE TABLE ingest_status (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(25) NOT NULL
+);
+
 CREATE TABLE databases (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    ingest_status VARCHAR(50)
+    ingest_status_id INT,
+    FOREIGN KEY (ingest_status_id) REFERENCES ingest_status(id) ON DELETE SET NULL
 );
 
 CREATE TABLE objects (
@@ -33,3 +39,7 @@ CREATE TABLE object_details (
     FOREIGN KEY (object_id) REFERENCES objects(id) ON DELETE CASCADE,
     UNIQUE (database_id, object_id, column_name)
 );
+
+INSERT INTO ingest_status VALUES(1, 'Sukces');
+INSERT INTO ingest_status VALUES(2, 'Niepowodzenie');
+INSERT INTO ingest_status VALUES(3, 'W toku');

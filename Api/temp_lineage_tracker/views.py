@@ -8,10 +8,16 @@ import requests
 
 class ListDatabasesView(View):
     def get(self, request):
-        databases = Database.objects.all()
+        databases = Database.objects.select_related('ingest_status').all()
         databases_dict = {
-            'databases': [
-                {'id': db.id, 'name': db.name, 'ingest_status': db.ingest_status} for db in databases
+            'databases': [{
+                'id': db.id,
+                'name': db.name,
+                'ingest_status': {
+                    'id': db.ingest_status.id,
+                    'name': db.ingest_status.name
+                } if db.ingest_status else None
+            } for db in databases
             ]
         }
         return JsonResponse(databases_dict)
@@ -19,7 +25,6 @@ class ListDatabasesView(View):
 
 class ListObjectsView(View):
     def get(self, request, database_id):
-        print(database_id)
         database = get_object_or_404(Database, id=database_id)
         objects = Object.objects.filter(database=database)
         response_data = {

@@ -1,6 +1,9 @@
-version: "3"
+version: "3.8"
+
+name: lineage-management
+
 services:
-  data-lineage-management:
+  database:
     image: postgres
     environment:
       POSTGRES_USER: postgres

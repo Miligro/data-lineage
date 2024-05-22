@@ -36,6 +36,9 @@
       no-data-text="Brak danych"
       loading-text="Pobieranie danych"
     >
+      <template #[`item.ingest_status`]="{ item }">
+        {{ item.ingest_status ? item.ingest_status.name : '' }}
+      </template>
       <template #[`item.actions`]="{ item }">
         <div class="d-flex">
           <v-btn
@@ -64,6 +67,7 @@ const router = useRouter()
 const databases = ref<Array<DatabaseInterface>>([])
 const loading = ref<boolean>(true)
 const search = ref<string>('')
+const fetchDatabaseInterval = ref<NodeJS.Timeout | null>(null)
 
 const fetchDatabases = async () => {
   loading.value = true
@@ -88,6 +92,14 @@ const ingestData = async (id: number | string) => {
 }
 
 fetchDatabases()
+onBeforeMount(() => {
+  fetchDatabaseInterval.value = setInterval(() => fetchDatabases(), 10000)
+})
+onBeforeUnmount(() => {
+  if (fetchDatabaseInterval) {
+    clearInterval(fetchDatabaseInterval.value)
+  }
+})
 </script>
 
 <style lang="scss" scoped>

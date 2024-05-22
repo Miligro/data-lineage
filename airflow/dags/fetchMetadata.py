@@ -17,7 +17,7 @@ DB_USER = 'postgres'
 DB_PASSWORD = 'postgres'
 DB_PORT = 5432
 
-DJANGO_DB_HOST = 'database-data-lineage-management-1'
+DJANGO_DB_HOST = 'lineage-management-database-1'
 DJANGO_DB_NAME = 'LineageManagement'
 DJANGO_DB_USER = 'postgres'
 DJANGO_DB_PASSWORD = 'postgres'
@@ -35,7 +35,7 @@ def update_status_to_django(status, database_id, **context):
 
     with engine.begin() as connection:
         connection.execute(
-            databases_table.update().values(ingest_status=status).where(databases_table.c.id == database_id))
+            databases_table.update().values(ingest_status_id=status).where(databases_table.c.id == database_id))
 
     session.close()
 
@@ -225,13 +225,13 @@ def load_relationships_to_django(ti):
 
 
 def set_in_progress_status(**context):
-    update_status_to_django('in_progress', 1, **context)
+    update_status_to_django(3, 1, **context)
 
 
 def set_final_status(**context):
     task_instances = context['dag_run'].get_task_instances()
     any_failed = any(ti.state == 'failed' for ti in task_instances if ti.task_id != 'set_final_status')
-    status = 'success' if not any_failed else 'failed'
+    status = 1 if not any_failed else 2
     update_status_to_django(status, 1, **context)
 
 
