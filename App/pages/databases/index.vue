@@ -1,6 +1,6 @@
 <template>
   <v-card class="table-card">
-    <v-card-title class="d-flex justify-end pa-2">
+    <v-card-title class="d-flex justify-end pa-2 ga-4">
       <v-text-field
         v-model="search"
         density="compact"
@@ -11,6 +11,7 @@
         hide-details
         single-line
       ></v-text-field>
+      <v-btn @click="loadDatabases"> Zaczytaj bazy danych </v-btn>
     </v-card-title>
     <v-data-table
       v-model:search="search"
@@ -88,6 +89,13 @@ const redirectToObjectsList = (id: number | string) => {
 const ingestData = async (id: number | string) => {
   try {
     await useApiFetch(`/databases/${id}/ingest/`, { method: 'POST' })
+  } catch {}
+}
+
+const loadDatabases = async () => {
+  try {
+    await useApiFetch(`/databases/load/`, { method: 'POST' })
+    await fetchDatabases()
   } catch {}
 }
 

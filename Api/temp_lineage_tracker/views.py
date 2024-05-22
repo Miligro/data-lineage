@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.db import models
 from .models import Database, Object, ObjectRelationship
 import requests
-
+import yaml
 
 class ListDatabasesView(View):
     def get(self, request):
@@ -97,7 +97,12 @@ class LineageModelView(View):
     def post(self, _, database_id):
         url = AIRFLOW_URL.format(dag_id='postgres_to_django')
         auth = (AIRFLOW_USERNAME, AIRFLOW_PASSWORD)
-        response = requests.post(url, auth=auth, json={})
+        payload = {
+            "conf": {
+                "database_id": database_id,
+            }
+        }
+        response = requests.post(url, auth=auth, json=payload)
 
         if response.status_code == 200:
             return JsonResponse({'status': 'success', 'message': 'DAG triggered successfully'})
@@ -122,3 +127,16 @@ class LineageModelView(View):
         else:
             return JsonResponse(
                 {'status': 'error', 'message': 'Failed to retrieve DAG status', 'details': response.json()})
+
+
+class LoadDatabasesView(View):
+    def post(self, request):
+        with open('lineage-databases/databases.yml', 'r') as file:
+            config = yaml.safe_load(file)
+            databases = config['databases']
+            for db in databases:
+                Database.objects.get_or_create(
+                    id=db['id'],
+                    name=db['name'],
+                )
+            return JsonResponse({'status': 'success'})

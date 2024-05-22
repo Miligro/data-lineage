@@ -11,7 +11,7 @@ class IngestStatus(models.Model):
 
 
 class Database(models.Model):
-    id = models.AutoField(primary_key=True)
+    id = models.CharField(max_length=50, primary_key=True)
     name = models.CharField(max_length=255)
     ingest_status = models.ForeignKey(IngestStatus, null=True, on_delete=models.SET_NULL)
 

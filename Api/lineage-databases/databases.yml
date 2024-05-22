@@ -1,0 +1,19 @@
+databases:
+  - id: postgres-test
+    type: postgres
+    name: PostgreSQL
+    host: localhost
+    port: 5434
+    user: postgres
+    password: postgres
+    db_name: healthcare
+  - id: postgres-train
+    type: postgres
+    name: PostgreSQL train
+    host: localhost
+    port: 5433
+    user: postgres
+    password: postgres
+    db_name: online_store
+
+

@@ -1,0 +1,19 @@
+databases:
+  - id: postgres-test
+    type: postgres
+    name: PostgreSQL
+    host: lineage-databases-test-database-1
+    port: 5432
+    user: postgres
+    password: postgres
+    db_name: healthcare
+  - id: postgres-train
+    type: postgres
+    name: PostgreSQL train
+    host: lineage-databases-model-train-database-1
+    port: 5432
+    user: postgres
+    password: postgres
+    db_name: online_store
+
+

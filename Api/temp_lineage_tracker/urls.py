@@ -19,6 +19,7 @@ from . import views
 
 urlpatterns = [
     path('databases/', views.ListDatabasesView.as_view(), name='databases'),
+    path('databases/load/', views.LoadDatabasesView.as_view(), name='databases_load'),
     path('databases/<str:database_id>/objects/', views.ListObjectsView.as_view(), name='objects'),
     path('databases/<str:database_id>/objects/<str:object_id>/relationships/',
          views.ListObjectRelationshipsView.as_view(), name='relationships'),
