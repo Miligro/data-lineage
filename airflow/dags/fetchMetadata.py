@@ -303,17 +303,17 @@ with DAG(
         schedule_interval='@daily',
         catchup=False
 ) as dag:
-    # manage_objects_task = PythonOperator(
-    #     task_id='manage_objects',
-    #     python_callable=manage_objects,
-    #     provide_context=True
-    # )
-    #
-    # manage_relationships_task = PythonOperator(
-    #     task_id='fetch_relationships',
-    #     python_callable=manage_relationships,
-    #     provide_context=True
-    # )
+    manage_objects_task = PythonOperator(
+        task_id='manage_objects',
+        python_callable=manage_objects,
+        provide_context=True
+    )
+
+    manage_relationships_task = PythonOperator(
+        task_id='fetch_relationships',
+        python_callable=manage_relationships,
+        provide_context=True
+    )
 
     manage_relationships_details_task = PythonOperator(
         task_id='manage_relationships_details',
@@ -321,24 +321,23 @@ with DAG(
         provide_context=True
     )
 
-    # manage_relationships_by_model_task = PythonOperator(
-    #     task_id='fetch_relationships_by_model',
-    #     python_callable=manage_relationships_by_model,
-    #     provide_context=True
-    # )
-    #
-    # set_in_progress_task = PythonOperator(
-    #     task_id='set_in_progress_status',
-    #     python_callable=set_in_progress_status,
-    #     provide_context=True
-    # )
-    #
-    # set_final_status_task = PythonOperator(
-    #     task_id='set_final_status',
-    #     python_callable=set_final_status,
-    #     trigger_rule='all_done',
-    #     provide_context=True
-    # )
+    manage_relationships_by_model_task = PythonOperator(
+        task_id='fetch_relationships_by_model',
+        python_callable=manage_relationships_by_model,
+        provide_context=True
+    )
 
-    # set_in_progress_task >> manage_objects_task >> manage_relationships_task >> manage_relationships_by_model_task >> set_final_status_task
-    manage_relationships_details_task
+    set_in_progress_task = PythonOperator(
+        task_id='set_in_progress_status',
+        python_callable=set_in_progress_status,
+        provide_context=True
+    )
+
+    set_final_status_task = PythonOperator(
+        task_id='set_final_status',
+        python_callable=set_final_status,
+        trigger_rule='all_done',
+        provide_context=True
+    )
+
+    set_in_progress_task >> manage_objects_task >> manage_relationships_task >> manage_relationships_details_task >> manage_relationships_by_model_task >> set_final_status_task
