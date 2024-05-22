@@ -13,6 +13,7 @@ CREATE TABLE databases (
 CREATE TABLE objects (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    type VARCHAR(50) NOT NULL,
     database_id VARCHAR(50) NOT NULL,
     FOREIGN KEY (database_id) REFERENCES databases(id) ON DELETE CASCADE
 );
@@ -27,6 +28,15 @@ CREATE TABLE object_relationships (
     FOREIGN KEY (source_object_id) REFERENCES objects(id) ON DELETE CASCADE,
     FOREIGN KEY (target_object_id) REFERENCES objects(id) ON DELETE CASCADE,
     UNIQUE (database_id, source_object_id, target_object_id)
+);
+
+CREATE TABLE object_relationships_details (
+    id SERIAL PRIMARY KEY,
+    database_id VARCHAR(50) NOT NULL,
+    relation_id INT NOT NULL,
+    column_name VARCHAR(255) NOT NULL,
+    FOREIGN KEY (relation_id) REFERENCES object_relationships(id) ON DELETE CASCADE,
+    FOREIGN KEY (database_id) REFERENCES databases(id) ON DELETE CASCADE
 );
 
 CREATE TABLE object_details (

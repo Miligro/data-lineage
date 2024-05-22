@@ -41,6 +41,7 @@ def get_database_manager(**kwargs):
             return db_manager
     return None
 
+
 def update_status_to_django(status, **kwargs):
     database_id = kwargs['dag_run'].conf.get('database_id')
     engine = get_lineage_database_engine()
@@ -56,7 +57,8 @@ def update_status_to_django(status, **kwargs):
     session.close()
 
 
-def fetch_objects(ti, **kwargs):
+def manage_objects(**kwargs):
+    database_id = kwargs['dag_run'].conf.get('database_id')
     db_manager = get_database_manager(**kwargs)
 
     metadata = db_manager.fetch_table_metadata()
@@ -64,41 +66,166 @@ def fetch_objects(ti, **kwargs):
     functions = db_manager.fetch_stored_functions()
     db_manager.close()
 
-    object_names = (list({row[0] for row in metadata}) + list({row[1] for row in procedures})
-                    + list({row[1] for row in functions}))
+    objects = (list({(row[0], row[3]) for row in metadata}) + list({(row[0], row[3]) for row in procedures})
+                    + list({(row[0], row[3]) for row in functions}))
 
-    ti.xcom_push(key='object_names', value=object_names)
+    objects_records = [{'database_id': database_id, 'name': tab, 'type': tab_type} for tab, tab_type in objects]
+
+    engine = get_lineage_database_engine()
+    objects_records_df = pd.DataFrame(objects_records)
+    session = sessionmaker(bind=engine)()
+
+    metadata_obj = MetaData(bind=engine)
+    metadata_obj.reflect(only=['objects'])
+    objects_table = Table('objects', metadata_obj, autoload_with=engine)
+    data_dicts = objects_records_df.to_dict('records')
+
+    with engine.begin() as connection:
+        connection.execute(objects_table.delete().where(objects_table.c.database_id == database_id))
+        connection.execute(objects_table.insert(), data_dicts)
+
+    objects_df = pd.read_sql_table('objects', engine)
+    object_id_map = objects_df.set_index('name')['id'].to_dict()
+
+    columns_details = []
+    for (table_name, column_name, data_type, table_type) in metadata:
+        object_id = object_id_map.get(table_name)
+        if object_id:
+            columns_details.append({
+                'database_id': database_id,
+                'object_id': object_id,
+                'column_name': column_name,
+                'column_type': data_type
+            })
+
+    object_details_df = pd.DataFrame(columns_details)
+    metadata_obj.reflect(only=['object_details'])
+    object_details_table = Table('object_details', metadata_obj, autoload_with=engine)
+    details_data_dicts = object_details_df.to_dict('records')
+
+    with engine.begin() as connection:
+        connection.execute(object_details_table.delete().where(object_details_table.c.database_id == database_id))
+        connection.execute(object_details_table.insert(), details_data_dicts)
+
+    session.close()
 
 
-def fetch_relationships(ti, **kwargs):
+def manage_relationships(**kwargs):
+    database_id = kwargs['dag_run'].conf.get('database_id')
     db_manager = get_database_manager(**kwargs)
     constraints = db_manager.fetch_table_constraints()
     views = db_manager.fetch_view_dependencies()
     procedures = db_manager.fetch_stored_procedures()
     functions = db_manager.fetch_stored_functions()
     db_manager.close()
-    relationships = []
 
+    relationships = []
     for constraint in constraints:
         source = constraint[1]
-        target = constraint[3]
+        target = constraint[4]
         relationships.append({"source": source, "target": target})
     for view in views:
-        source_view = view[1]
-        target_table = view[3]
+        source_view = view[0]
+        target_table = view[2]
         relationships.append({"source": source_view, "target": target_table})
 
     for procedure in procedures + functions:
-        procedure_name = procedure[1]
-        parser = SQLParser(procedure[3])
+        procedure_name = procedure[0]
+        parser = SQLParser(procedure[2])
         objects = parser.extract_related_objects()
         for obj in objects:
             if obj != procedure_name:
                 relationships.append({"source": procedure_name, "target": obj})
-    ti.xcom_push(key='relationships', value=relationships)
+
+    engine = get_lineage_database_engine()
+    session = sessionmaker(bind=engine)()
+
+    objects_df = pd.read_sql_table('objects', engine)
+    object_id_map = objects_df.set_index('name')['id'].to_dict()
+
+    unique_relationships = set()
+    for rel in relationships:
+        source_name = rel['source']
+        target_name = rel['target']
+        connection_probability = 1
+
+        source_id = object_id_map.get(source_name)
+        target_id = object_id_map.get(target_name)
+        if source_id is None or target_id is None:
+            continue
+
+        unique_relationships.add((
+            database_id,
+            source_id,
+            target_id,
+            connection_probability
+        ))
+
+    data_dicts = [
+        {
+            'database_id': database_id,
+            'source_object_id': source_id,
+            'target_object_id': target_id,
+            'connection_probability': connection_probability
+        }
+        for (database_id, source_id, target_id, connection_probability) in unique_relationships
+    ]
+
+    metadata_obj = MetaData(bind=engine)
+    metadata_obj.reflect(only=['object_relationships'])
+    relationships_table = Table('object_relationships', metadata_obj, autoload_with=engine)
+
+    with engine.begin() as connection:
+        connection.execute(relationships_table.delete().where(relationships_table.c.database_id == database_id))
+        connection.execute(relationships_table.insert(), data_dicts)
+
+    session.close()
 
 
-def fetch_relationships_by_model(**kwargs):
+def manage_relationships_details(**kwargs):
+    database_id = kwargs['dag_run'].conf.get('database_id')
+    db_manager = get_database_manager(**kwargs)
+    constraints = db_manager.fetch_table_constraints()
+    views = db_manager.fetch_view_dependencies()
+    db_manager.close()
+
+    engine = get_lineage_database_engine()
+    session = sessionmaker(bind=engine)()
+    object_relationships_df = pd.read_sql_table('object_relationships', engine)
+    objects_df = pd.read_sql_table('objects', engine)
+    merged_df = object_relationships_df.merge(objects_df, left_on='source_object_id', right_on='id',
+                                              suffixes=('', '_source'))
+    merged_df = merged_df.merge(objects_df, left_on='target_object_id', right_on='id', suffixes=('', '_target'))
+    result_df = merged_df[
+        ['id', 'source_object_id', 'name', 'target_object_id', 'name_target']]
+
+    object_id_map = result_df.set_index(['name', 'name_target'])['id'].to_dict()
+
+    relationships_details = []
+    for constraint in constraints:
+        relationship_id = object_id_map.get((constraint[1], constraint[3]))
+        if relationship_id:
+            relationships_details.append({"database_id": database_id, "relation_id": relationship_id,
+                                          "column_name": constraint[4]})
+
+    for view in views:
+        relationship_id = object_id_map.get((view[0], view[2]))
+        if relationship_id:
+            relationships_details.append({"database_id": database_id, "relation_id": relationship_id,
+                                          "column_name": view[3]})
+
+    metadata_obj = MetaData(bind=engine)
+    metadata_obj.reflect(only=['object_relationships_details'])
+    relationships_details_table = Table('object_relationships_details', metadata_obj, autoload_with=engine)
+
+    with engine.begin() as connection:
+        connection.execute(relationships_details_table.delete().where(relationships_details_table.c.database_id == database_id))
+        connection.execute(relationships_details_table.insert(), relationships_details)
+
+    session.close()
+
+
+def manage_relationships_by_model(**kwargs):
     database_id = kwargs['dag_run'].conf.get('database_id')
     db_manager = get_database_manager(**kwargs)
 
@@ -159,80 +286,6 @@ def fetch_relationships_by_model(**kwargs):
     session.close()
 
 
-def load_objects_to_django(ti, **kwargs):
-    database_id = kwargs['dag_run'].conf.get('database_id')
-    object_names = ti.xcom_pull(task_ids='fetch_objects', key='object_names')
-    if not object_names:
-        raise ValueError("No data fetched from XCom.")
-    metadata = [{'database_id': database_id, 'name': tab} for tab in object_names]
-
-    engine = get_lineage_database_engine()
-    metadata_df = pd.DataFrame(metadata)
-    session = sessionmaker(bind=engine)()
-
-    metadata_obj = MetaData(bind=engine)
-    metadata_obj.reflect(only=['objects'])
-    objects_table = Table('objects', metadata_obj, autoload_with=engine)
-    data_dicts = metadata_df.to_dict('records')
-
-    with engine.begin() as connection:
-        connection.execute(objects_table.delete())
-        connection.execute(objects_table.insert(), data_dicts)
-
-    session.close()
-
-
-def load_relationships_to_django(ti, **kwargs):
-    database_id = kwargs['dag_run'].conf.get('database_id')
-    relationships = ti.xcom_pull(task_ids='fetch_relationships', key='relationships')
-    if not relationships:
-        raise ValueError("No data fetched from XCom.")
-
-    engine = get_lineage_database_engine()
-    session = sessionmaker(bind=engine)()
-
-    objects_df = pd.read_sql_table('objects', engine)
-    object_id_map = objects_df.set_index('name')['id'].to_dict()
-
-    unique_relationships = set()
-    for rel in relationships:
-        source_name = rel['source']
-        target_name = rel['target']
-        connection_probability = 1
-
-        source_id = object_id_map.get(source_name)
-        target_id = object_id_map.get(target_name)
-        if source_id is None or target_id is None:
-            continue
-
-        unique_relationships.add((
-            database_id,
-            source_id,
-            target_id,
-            connection_probability
-        ))
-
-    data_dicts = [
-        {
-            'database_id': database_id,
-            'source_object_id': source_id,
-            'target_object_id': target_id,
-            'connection_probability': connection_probability
-        }
-        for (database_id, source_id, target_id, connection_probability) in unique_relationships
-    ]
-
-    metadata_obj = MetaData(bind=engine)
-    metadata_obj.reflect(only=['object_relationships'])
-    relationships_table = Table('object_relationships', metadata_obj, autoload_with=engine)
-
-    with engine.begin() as connection:
-        connection.execute(relationships_table.delete())
-        connection.execute(relationships_table.insert(), data_dicts)
-
-    session.close()
-
-
 def set_in_progress_status(**kwargs):
     update_status_to_django(3, **kwargs)
 
@@ -250,47 +303,42 @@ with DAG(
         schedule_interval='@daily',
         catchup=False
 ) as dag:
-    fetch_objects_task = PythonOperator(
-        task_id='fetch_objects',
-        python_callable=fetch_objects,
+    # manage_objects_task = PythonOperator(
+    #     task_id='manage_objects',
+    #     python_callable=manage_objects,
+    #     provide_context=True
+    # )
+    #
+    # manage_relationships_task = PythonOperator(
+    #     task_id='fetch_relationships',
+    #     python_callable=manage_relationships,
+    #     provide_context=True
+    # )
+
+    manage_relationships_details_task = PythonOperator(
+        task_id='manage_relationships_details',
+        python_callable=manage_relationships_details,
         provide_context=True
     )
 
-    load_objects_task = PythonOperator(
-        task_id='load_objects_to_django',
-        python_callable=load_objects_to_django,
-        provide_context=True
-    )
+    # manage_relationships_by_model_task = PythonOperator(
+    #     task_id='fetch_relationships_by_model',
+    #     python_callable=manage_relationships_by_model,
+    #     provide_context=True
+    # )
+    #
+    # set_in_progress_task = PythonOperator(
+    #     task_id='set_in_progress_status',
+    #     python_callable=set_in_progress_status,
+    #     provide_context=True
+    # )
+    #
+    # set_final_status_task = PythonOperator(
+    #     task_id='set_final_status',
+    #     python_callable=set_final_status,
+    #     trigger_rule='all_done',
+    #     provide_context=True
+    # )
 
-    fetch_relationships_task = PythonOperator(
-        task_id='fetch_relationships',
-        python_callable=fetch_relationships,
-        provide_context=True
-    )
-
-    load_relationships_task = PythonOperator(
-        task_id='load_relationships_to_django',
-        python_callable=load_relationships_to_django,
-        provide_context=True
-    )
-
-    fetch_relationships_by_model_task = PythonOperator(
-        task_id='fetch_relationships_by_model',
-        python_callable=fetch_relationships_by_model,
-        provide_context=True
-    )
-
-    set_in_progress_task = PythonOperator(
-        task_id='set_in_progress_status',
-        python_callable=set_in_progress_status,
-        provide_context=True
-    )
-
-    set_final_status_task = PythonOperator(
-        task_id='set_final_status',
-        python_callable=set_final_status,
-        trigger_rule='all_done',
-        provide_context=True
-    )
-
-    set_in_progress_task >> fetch_objects_task >> load_objects_task >> fetch_relationships_task >> load_relationships_task >> fetch_relationships_by_model_task >> set_final_status_task
+    # set_in_progress_task >> manage_objects_task >> manage_relationships_task >> manage_relationships_by_model_task >> set_final_status_task
+    manage_relationships_details_task

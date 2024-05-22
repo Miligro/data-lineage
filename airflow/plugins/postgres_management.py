@@ -30,13 +30,18 @@ class PostgresDatabaseManagement:
     def fetch_table_metadata(self):
         query = """
             SELECT
-                table_name,
-                column_name,
-                data_type
+                c.table_name,
+                c.column_name,
+                c.data_type,
+                t.table_type
             FROM
-                information_schema.columns
+                information_schema.columns c
+            JOIN
+                information_schema.tables t
+                ON c.table_name = t.table_name
+                AND c.table_schema = t.table_schema
             WHERE
-                table_schema NOT IN ('information_schema', 'pg_catalog');
+                c.table_schema NOT IN ('information_schema', 'pg_catalog');
         """
         result = self.engine.execute(query).fetchall()
         return result
@@ -65,12 +70,12 @@ class PostgresDatabaseManagement:
     def fetch_view_dependencies(self):
         query = """
         SELECT
-            view_schema,
             view_name,
             table_schema,
-            table_name
+            table_name,
+            column_name
         FROM
-            information_schema.view_table_usage
+            information_schema.view_column_usage
         WHERE
             view_schema NOT IN ('information_schema', 'pg_catalog');
         """
@@ -80,10 +85,10 @@ class PostgresDatabaseManagement:
     def fetch_stored_procedures(self):
         query = """
         SELECT
-            routine_schema,
             routine_name,
             data_type,
-            routine_definition
+            routine_definition,
+            routine_type
         FROM
             information_schema.routines
         WHERE
@@ -96,10 +101,10 @@ class PostgresDatabaseManagement:
     def fetch_stored_functions(self):
         query = """
         SELECT
-            routine_schema,
             routine_name,
             data_type,
-            routine_definition
+            routine_definition,
+            routine_type
         FROM
             information_schema.routines
         WHERE

@@ -35,7 +35,8 @@ class ListObjectsView(View):
             'objects': [
                 {
                     'id': obj.id,
-                    'name': obj.name
+                    'name': obj.name,
+                    'type': obj.type
                 } for obj in objects
             ]
         }
