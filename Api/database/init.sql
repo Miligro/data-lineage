@@ -4,7 +4,7 @@ CREATE TABLE ingest_status (
 );
 
 CREATE TABLE databases (
-    id SERIAL PRIMARY KEY,
+    id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     ingest_status_id INT,
     FOREIGN KEY (ingest_status_id) REFERENCES ingest_status(id) ON DELETE SET NULL
@@ -13,13 +13,13 @@ CREATE TABLE databases (
 CREATE TABLE objects (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    database_id INT NOT NULL,
+    database_id VARCHAR(50) NOT NULL,
     FOREIGN KEY (database_id) REFERENCES databases(id) ON DELETE CASCADE
 );
 
 CREATE TABLE object_relationships (
     id SERIAL PRIMARY KEY,
-    database_id INT NOT NULL,
+    database_id VARCHAR(50) NOT NULL,
     source_object_id INT NOT NULL,
     target_object_id INT NOT NULL,
     connection_probability FLOAT CHECK (connection_probability >= 0 AND connection_probability <= 1),
@@ -31,7 +31,7 @@ CREATE TABLE object_relationships (
 
 CREATE TABLE object_details (
     id SERIAL PRIMARY KEY,
-    database_id INT NOT NULL,
+    database_id VARCHAR(50) NOT NULL,
     object_id INT NOT NULL,
     column_name VARCHAR(255) NOT NULL,
     column_type VARCHAR(255) NOT NULL,
