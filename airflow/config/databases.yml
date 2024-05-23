@@ -15,5 +15,11 @@ databases:
     user: postgres
     password: postgres
     db_name: online_store
-
-
+  - id: sqlserver-lineage
+    type: sqlserver
+    name: SQL Server Lineage
+    host: localhost
+    port: 1433
+    user: SA
+    password: Mysecretpassword123!
+    db_name: bank

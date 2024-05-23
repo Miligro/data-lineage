@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import create_engine, MetaData, Table
 from sqlalchemy.orm import sessionmaker
 from postgres_management import PostgresDatabaseManagement
+from sqlserver_management import SQLServerDatabaseManagement
 from related_objects_extractor import SQLParser
 from model import *
 import pandas as pd
@@ -32,6 +33,15 @@ def get_database_manager(**kwargs):
     if database_config:
         if database_config['type'] == 'postgres':
             db_manager = PostgresDatabaseManagement(
+                database_config['host'],
+                database_config['db_name'],
+                database_config['user'],
+                database_config['password'],
+                database_config['port'])
+            db_manager.connect()
+            return db_manager
+        if database_config['type'] == 'sqlserver':
+            db_manager = SQLServerDatabaseManagement(
                 database_config['host'],
                 database_config['db_name'],
                 database_config['user'],
