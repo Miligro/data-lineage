@@ -320,7 +320,7 @@ with DAG(
     )
 
     manage_relationships_task = PythonOperator(
-        task_id='fetch_relationships',
+        task_id='manage_relationships',
         python_callable=manage_relationships,
         provide_context=True
     )
@@ -332,7 +332,7 @@ with DAG(
     )
 
     manage_relationships_by_model_task = PythonOperator(
-        task_id='fetch_relationships_by_model',
+        task_id='manage_relationships_by_model',
         python_callable=manage_relationships_by_model,
         provide_context=True
     )

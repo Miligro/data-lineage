@@ -24,3 +24,12 @@ services:
       - "5434:5432"
     volumes:
       - ./test-database-init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  sqlserver:
+    build: ./SQLServer
+    environment:
+      SA_PASSWORD: "Sqlserver123"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1433:1433"
+

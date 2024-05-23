@@ -18,8 +18,8 @@ databases:
   - id: sqlserver-lineage
     type: sqlserver
     name: SQL Server Lineage
-    host: localhost
+    host: lineage-databases-sqlserver-1
     port: 1433
     user: SA
-    password: Mysecretpassword123!
-    db_name: bank
+    password: Sqlserver123
+    db_name: healthcare
