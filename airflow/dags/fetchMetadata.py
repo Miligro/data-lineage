@@ -6,6 +6,7 @@ from sqlalchemy import create_engine, MetaData, Table
 from sqlalchemy.orm import sessionmaker
 from postgres_management import PostgresDatabaseManagement
 from sqlserver_management import SQLServerDatabaseManagement
+from oracle_management import OracleDatabaseManagement
 from related_objects_extractor import SQLParser
 from model import *
 import pandas as pd
@@ -40,13 +41,22 @@ def get_database_manager(**kwargs):
                 database_config['port'])
             db_manager.connect()
             return db_manager
-        if database_config['type'] == 'sqlserver':
+        elif database_config['type'] == 'sqlserver':
             db_manager = SQLServerDatabaseManagement(
                 database_config['host'],
                 database_config['db_name'],
                 database_config['user'],
                 database_config['password'],
                 database_config['port'])
+            db_manager.connect()
+            return db_manager
+        elif database_config['type'] == 'oracle':
+            db_manager = OracleDatabaseManagement(
+                database_config['host'],
+                database_config['port'],
+                database_config['db_name'],
+                database_config['user'],
+                database_config['password'])
             db_manager.connect()
             return db_manager
     return None
@@ -72,14 +82,12 @@ def manage_objects(**kwargs):
     db_manager = get_database_manager(**kwargs)
 
     metadata = db_manager.fetch_table_metadata()
-    procedures = db_manager.fetch_stored_procedures()
-    functions = db_manager.fetch_stored_functions()
+    routines = db_manager.fetch_routines()
     db_manager.close()
 
-    objects = (list({(row[0], row[3]) for row in metadata}) + list({(row[0], row[3]) for row in procedures})
-                    + list({(row[0], row[3]) for row in functions}))
-
-    objects_records = [{'database_id': database_id, 'name': tab, 'type': tab_type} for tab, tab_type in objects]
+    objects = (list({(row[0], row[3]) for row in metadata}) + list({(row[0], row[2]) for row in routines}))
+    objects_records = [{'database_id': database_id, 'name': tab, 'type': tab_type}
+                       for tab, tab_type in objects]
 
     engine = get_lineage_database_engine()
     objects_records_df = pd.DataFrame(objects_records)
@@ -125,23 +133,22 @@ def manage_relationships(**kwargs):
     db_manager = get_database_manager(**kwargs)
     constraints = db_manager.fetch_table_constraints()
     views = db_manager.fetch_view_dependencies()
-    procedures = db_manager.fetch_stored_procedures()
-    functions = db_manager.fetch_stored_functions()
+    routines = db_manager.fetch_routines()
     db_manager.close()
 
     relationships = []
     for constraint in constraints:
-        source = constraint[1]
-        target = constraint[4]
+        source = constraint[0]
+        target = constraint[3]
         relationships.append({"source": source, "target": target})
     for view in views:
         source_view = view[0]
-        target_table = view[2]
+        target_table = view[1]
         relationships.append({"source": source_view, "target": target_table})
 
-    for procedure in procedures + functions:
-        procedure_name = procedure[0]
-        parser = SQLParser(procedure[2])
+    for routine in routines:
+        procedure_name = routine[0]
+        parser = SQLParser(routine[1])
         objects = parser.extract_related_objects()
         for obj in objects:
             if obj != procedure_name:
@@ -213,16 +220,16 @@ def manage_relationships_details(**kwargs):
 
     relationships_details = []
     for constraint in constraints:
-        relationship_id = object_id_map.get((constraint[1], constraint[3]))
+        relationship_id = object_id_map.get((constraint[0], constraint[2]))
         if relationship_id:
             relationships_details.append({"database_id": database_id, "relation_id": relationship_id,
-                                          "column_name": constraint[4]})
+                                          "column_name": constraint[3]})
 
     for view in views:
-        relationship_id = object_id_map.get((view[0], view[2]))
+        relationship_id = object_id_map.get((view[0], view[1]))
         if relationship_id:
             relationships_details.append({"database_id": database_id, "relation_id": relationship_id,
-                                          "column_name": view[3]})
+                                          "column_name": view[2]})
 
     metadata_obj = MetaData(bind=engine)
     metadata_obj.reflect(only=['object_relationships_details'])

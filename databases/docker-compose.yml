@@ -12,7 +12,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - ./model-train-database-init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./PostgreSQL/model-train-database-init.sql:/docker-entrypoint-initdb.d/init.sql
 
   test-database:
     image: postgres
@@ -23,9 +23,9 @@ services:
     ports:
       - "5434:5432"
     volumes:
-      - ./test-database-init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./PostgreSQL/test-database-init.sql:/docker-entrypoint-initdb.d/init.sql
 
-  sqlserver:
+  sqlserver-test:
     build: ./SQLServer
     environment:
       SA_PASSWORD: "Sqlserver123"
@@ -33,3 +33,11 @@ services:
     ports:
       - "1433:1433"
 
+  oracle-test:
+    image: gvenzl/oracle-xe:latest
+    environment:
+      - ORACLE_PASSWORD=Oracle123
+    ports:
+      - "1521:1521"
+    volumes:
+      - ./Oracle/test-database-init.sql:/container-entrypoint-initdb.d/init.sql

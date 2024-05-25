@@ -23,3 +23,11 @@ databases:
     user: SA
     password: Sqlserver123
     db_name: healthcare
+  - id: oracle-lineage
+    type: oracle
+    name: Oracle Lineage
+    host: lineage-databases-oracle-test-1
+    port: 1521
+    user: C##data_lineage
+    password: Oracle123
+    db_name: XE

@@ -50,7 +50,6 @@ class SQLServerDatabaseManagement:
     def fetch_table_constraints(self):
         query = """
         SELECT
-            tc.TABLE_SCHEMA,
             tc.TABLE_NAME AS referencing_table,
             kcu.COLUMN_NAME AS referencing_column,
             ccu.TABLE_NAME AS referenced_table,
@@ -73,7 +72,6 @@ class SQLServerDatabaseManagement:
         query = """
         SELECT
             VIEW_NAME,
-            TABLE_SCHEMA,
             TABLE_NAME,
             COLUMN_NAME
         FROM
@@ -83,35 +81,20 @@ class SQLServerDatabaseManagement:
         return result
 
 
-    def fetch_stored_procedures(self):
+    def fetch_routines(self):
         query = """
         SELECT
             ROUTINE_NAME,
-            DATA_TYPE,
             ROUTINE_DEFINITION,
             ROUTINE_TYPE
         FROM
             INFORMATION_SCHEMA.ROUTINES
         WHERE
-            ROUTINE_TYPE='PROCEDURE';
+            ROUTINE_TYPE IN ('PROCEDURE', 'FUNCTION');
         """
         result = self.engine.execute(query).fetchall()
         return result
 
-    def fetch_stored_functions(self):
-        query = """
-        SELECT
-            ROUTINE_NAME,
-            DATA_TYPE,
-            ROUTINE_DEFINITION,
-            ROUTINE_TYPE
-        FROM
-            INFORMATION_SCHEMA.ROUTINES
-        WHERE
-            ROUTINE_TYPE='FUNCTION';
-        """
-        result = self.engine.execute(query).fetchall()
-        return result
 
     def fetch_metadata_for_model(self):
         query = """

@@ -49,7 +49,6 @@ class PostgresDatabaseManagement:
     def fetch_table_constraints(self):
         query = """
         SELECT
-            tc.table_schema,
             tc.table_name AS referencing_table,
             kcu.column_name AS referencing_column,
             ccu.table_name AS referenced_table,
@@ -71,7 +70,6 @@ class PostgresDatabaseManagement:
         query = """
         SELECT
             view_name,
-            table_schema,
             table_name,
             column_name
         FROM
@@ -82,34 +80,17 @@ class PostgresDatabaseManagement:
         result = self.engine.execute(query).fetchall()
         return result
 
-    def fetch_stored_procedures(self):
+    def fetch_routines(self):
         query = """
         SELECT
             routine_name,
-            data_type,
             routine_definition,
             routine_type
         FROM
             information_schema.routines
         WHERE
             routine_schema NOT IN ('pg_catalog', 'information_schema')
-            AND routine_type='PROCEDURE';
-        """
-        result = self.engine.execute(query).fetchall()
-        return result
-
-    def fetch_stored_functions(self):
-        query = """
-        SELECT
-            routine_name,
-            data_type,
-            routine_definition,
-            routine_type
-        FROM
-            information_schema.routines
-        WHERE
-            routine_schema NOT IN ('pg_catalog', 'information_schema')
-            AND routine_type='FUNCTION';
+            AND routine_type IN ('PROCEDURE', 'FUNCTION');
         """
         result = self.engine.execute(query).fetchall()
         return result
