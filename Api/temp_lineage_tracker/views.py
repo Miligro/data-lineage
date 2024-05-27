@@ -2,7 +2,7 @@ from django.shortcuts import get_object_or_404
 from django.views import View
 from django.http import JsonResponse
 from django.db import models
-from .models import Database, Object, ObjectRelationship
+from .models import Database, Object, ObjectRelationship, ObjectDetail, ObjectRelationshipDetail
 import requests
 import yaml
 
@@ -55,8 +55,32 @@ class ListObjectRelationshipsView(View):
 
         objects_set = set()
         for relationship in relationships:
-            objects_set.add((relationship.source_object.id, relationship.source_object.name))
-            objects_set.add((relationship.target_object.id, relationship.target_object.name))
+            objects_set.add((relationship.source_object.id, relationship.source_object.name, relationship.source_object.type))
+            objects_set.add((relationship.target_object.id, relationship.target_object.name, relationship.target_object.type))
+
+        object_ids = [object_t[0] for object_t in objects_set]
+        object_details = ObjectDetail.objects.filter(database=database, object_id__in=object_ids)
+
+        object_details_dict = {}
+        for detail in object_details:
+            if detail.object_id not in object_details_dict:
+                object_details_dict[detail.object_id] = []
+            object_details_dict[detail.object_id].append({
+                'column_name': detail.column_name,
+                'column_type': detail.column_type
+            })
+
+        relationship_ids = [rel.id for rel in relationships]
+        relationship_details = ObjectRelationshipDetail.objects.filter(database=database,
+                                                                       relation_id__in=relationship_ids)
+
+        relationship_details_dict = {}
+        for detail in relationship_details:
+            if detail.relation_id not in relationship_details_dict:
+                relationship_details_dict[detail.relation_id] = []
+            relationship_details_dict[detail.relation_id].append({
+                'column_name': detail.column_name
+            })
 
         response_data = {
             'database': {
@@ -68,23 +92,26 @@ class ListObjectRelationshipsView(View):
                 'name': obj.name
             },
             'relationships': [
-                                 {
-                                     'data': {
-                                         'id': f'{rel.source_object.id}-{rel.target_object.id}',
-                                         'source': rel.source_object.id,
-                                         'target': rel.target_object.id,
-                                         'connection_probability': rel.connection_probability
-                                     },
-                                 } for rel in relationships
-                             ]
-                             + [
-                                 {
-                                     'data': {
-                                         'id': object_t[0],
-                                         'label': object_t[1]
-                                     }
-                                 } for object_t in objects_set
-                             ]
+             {
+                 'data': {
+                     'id': f'{rel.source_object.id}-{rel.target_object.id}',
+                     'source': rel.source_object.id,
+                     'target': rel.target_object.id,
+                     'connection_probability': rel.connection_probability,
+                     'details': relationship_details_dict.get(rel.id, [])
+                 },
+             } for rel in relationships
+            ]
+            + [
+             {
+                 'data': {
+                     'id': object_t[0],
+                     'label': object_t[1],
+                     'type': object_t[2],
+                     'details': object_details_dict.get(object_t[0], [])
+                 }
+             } for object_t in objects_set
+            ]
         }
         return JsonResponse(response_data)
 

@@ -16,6 +16,7 @@
     "axios": "^1.6.8",
     "cytoscape": "^3.29.2",
     "cytoscape-node-html-label": "^1.2.2",
+    "cytoscape-popper": "^4.0.0",
     "d3": "^7.9.0",
     "gojs": "^3.0.1",
     "nuxt": "3.11.2",
