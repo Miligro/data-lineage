@@ -14,6 +14,7 @@
         v-if="nodeTooltip.visible"
         :model-value="nodeTooltip.visible"
         activator="parent"
+        class="lineage-object-tooltip"
         :target="[nodeTooltip.position.left, nodeTooltip.position.top]"
       >
         <div
@@ -26,7 +27,7 @@
         >
           <span>Nazwa obiektu: {{ nodeTooltip.name }}</span>
           <span>Typ obiektu: {{ nodeTooltip.type }}</span>
-          <table>
+          <table v-if="nodeTooltip.details && nodeTooltip.details.length">
             <tr>
               <th>Kolumna</th>
               <th>Typ</th>
@@ -42,6 +43,7 @@
         v-if="edgeTooltip.visible"
         :model-value="edgeTooltip.visible"
         activator="parent"
+        class="lineage-object-tooltip"
         :target="[edgeTooltip.position.left, edgeTooltip.position.top]"
       >
         <div
@@ -257,7 +259,7 @@ onMounted(() => {
 })
 </script>
 
-<style>
+<style lang="scss">
 .container {
   position: relative;
   height: 100%;
@@ -301,8 +303,8 @@ onMounted(() => {
   border-width: 2px !important;
 }
 
-td,
-th {
+.lineage-object-tooltip td,
+.lineage-object-tooltip th {
   border: 1px solid #dddddd;
   text-align: left;
   padding: 8px;
