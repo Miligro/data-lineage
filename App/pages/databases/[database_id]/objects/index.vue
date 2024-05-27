@@ -81,5 +81,6 @@ fetchObjects()
 <style lang="scss" scoped>
 .table-card {
   padding: 2rem;
+  height: 100%;
 }
 </style>

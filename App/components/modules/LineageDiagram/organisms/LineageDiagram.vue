@@ -1,83 +1,103 @@
 <template>
-  <div class="container">
-    <input
-      id="zoom-slider"
-      type="range"
-      min="0.1"
-      max="2.0"
-      step="0.01"
-      value="1.0"
-      style="position: absolute; bottom: 20px; right: 20px; z-index: 2"
-    />
-    <div ref="cyContainer" class="cy-container">
-      <v-tooltip
-        v-if="nodeTooltip.visible"
-        :model-value="nodeTooltip.visible"
-        activator="parent"
-        class="lineage-object-tooltip"
-        :target="[nodeTooltip.position.left, nodeTooltip.position.top]"
-      >
-        <div
-          style="
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-          "
+  <div class="lineage">
+    <v-card class="sliders-card">
+      <div class="slider-container">
+        <span class="font-weight-bold">Przybliżenie: {{ zoomLevel }}</span>
+        <v-slider
+          id="zoom-slider"
+          v-model="zoomLevel"
+          :min="0.1"
+          :max="2.0"
+          :step="0.01"
+          hide-details
+          @update:model-value="onZoomChange"
+        />
+      </div>
+      <div class="slider-container">
+        <span class="font-weight-bold"
+          >Próg graniczny prawdopodobieństwa: {{ thresholdLevel }}</span
         >
-          <span>Nazwa obiektu: {{ nodeTooltip.name }}</span>
-          <span>Typ obiektu: {{ nodeTooltip.type }}</span>
-          <table v-if="nodeTooltip.details && nodeTooltip.details.length">
-            <tr>
-              <th>Kolumna</th>
-              <th>Typ</th>
-            </tr>
-            <tr v-for="(column, index) in nodeTooltip.details" :key="index">
-              <td>{{ column.column_name }}</td>
-              <td>{{ column.column_type }}</td>
-            </tr>
-          </table>
-        </div>
-      </v-tooltip>
-      <v-tooltip
-        v-if="edgeTooltip.visible"
-        :model-value="edgeTooltip.visible"
-        activator="parent"
-        class="lineage-object-tooltip"
-        :target="[edgeTooltip.position.left, edgeTooltip.position.top]"
-      >
-        <div
-          style="
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-          "
+        <v-slider
+          v-model="thresholdLevel"
+          :min="1"
+          :max="100"
+          :step="0.5"
+          hide-details
+          @update:model-value="onThresholdChange"
+        />
+      </div>
+    </v-card>
+    <div class="container">
+      <div ref="cyContainer" class="cy-container">
+        <v-tooltip
+          v-if="nodeTooltip.visible"
+          :model-value="nodeTooltip.visible"
+          activator="parent"
+          class="lineage-object-tooltip"
+          :target="[nodeTooltip.position.left, nodeTooltip.position.top]"
         >
-          <template v-if="edgeTooltip.details && edgeTooltip.details.length">
-            <span
-              >Powiązania pomiędzy: {{ edgeTooltip.source_name }} -
-              {{ edgeTooltip.target_name }}</span
-            >
-            <table>
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+            "
+          >
+            <span>Nazwa obiektu: {{ nodeTooltip.name }}</span>
+            <span>Typ obiektu: {{ nodeTooltip.type }}</span>
+            <table v-if="nodeTooltip.details && nodeTooltip.details.length">
               <tr>
-                <th>Nazwa kolumny</th>
+                <th>Kolumna</th>
+                <th>Typ</th>
               </tr>
-              <tr v-for="(column, index) in edgeTooltip.details" :key="index">
+              <tr v-for="(column, index) in nodeTooltip.details" :key="index">
                 <td>{{ column.column_name }}</td>
+                <td>{{ column.column_type }}</td>
               </tr>
             </table>
-          </template>
-          <span v-else>Nie znaleziono elementów powiązania</span>
-        </div>
-      </v-tooltip>
+          </div>
+        </v-tooltip>
+        <v-tooltip
+          v-if="edgeTooltip.visible"
+          :model-value="edgeTooltip.visible"
+          activator="parent"
+          class="lineage-object-tooltip"
+          :target="[edgeTooltip.position.left, edgeTooltip.position.top]"
+        >
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+            "
+          >
+            <template v-if="edgeTooltip.details && edgeTooltip.details.length">
+              <span
+                >Powiązania pomiędzy: {{ edgeTooltip.source_name }} -
+                {{ edgeTooltip.target_name }}</span
+              >
+              <table>
+                <tr>
+                  <th>Nazwa kolumny</th>
+                </tr>
+                <tr v-for="(column, index) in edgeTooltip.details" :key="index">
+                  <td>{{ column.column_name }}</td>
+                </tr>
+              </table>
+            </template>
+            <span v-else>Nie znaleziono elementów powiązania</span>
+          </div>
+        </v-tooltip>
+      </div>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { onMounted, ref } from 'vue'
-import cytoscape from 'cytoscape'
+import cytoscape, { type Core, type ElementDefinition } from 'cytoscape'
 import nodeHtmlLabel from 'cytoscape-node-html-label'
 import { VTooltip } from 'vuetify/components'
 import type ObjectRelationshipsResponseInterface from '~/features/relationship/interfaces/ObjectRelationshipsResponseInterface'
@@ -112,18 +132,54 @@ const edgeTooltip = ref({
 })
 
 const cyContainer = ref<HTMLElement | null>(null)
+const cy = ref<Core | null>(null)
 const zoomLevel = ref(1.0)
+const thresholdLevel = ref(1.0)
+const relationships = ref<Array<ElementDefinition>>([])
 
-const response = await useApiFetch<ObjectRelationshipsResponseInterface>(
-  `/databases/${props.databaseId}/objects/${props.objectId}/relationships`
-)
+const relationshipsResponse =
+  await useApiFetch<ObjectRelationshipsResponseInterface>(
+    `/databases/${props.databaseId}/objects/${props.objectId}/relationships`
+  )
+relationships.value = relationshipsResponse.relationships
+
+const onThresholdChange = (value: number) => {
+  relationships.value = relationshipsResponse.relationships.filter(
+    (relationship) => {
+      return !!(
+        (relationship.data.connection_probability &&
+          relationship.data.connection_probability > value / 100) ||
+        relationship.data.connection_probability === undefined
+      )
+    }
+  )
+
+  if (cy.value) {
+    cy.value.json({ elements: relationships.value })
+    cy.value
+      .nodes()
+      .filter((node) => {
+        return node.connectedEdges().length === 0
+      })
+      .remove()
+    cy.value.layout({ name: 'breadthfirst' }).run()
+    cy.value.fit()
+  }
+}
+
+const onZoomChange = (value: number) => {
+  if (cy.value) {
+    cy.value.zoom(value)
+    cy.value.center()
+  }
+}
 
 onMounted(() => {
   if (!cyContainer.value) return
 
-  const cy = cytoscape({
+  cy.value = cytoscape({
     container: cyContainer.value,
-    elements: response.relationships,
+    elements: relationships.value,
     style: [
       {
         selector: 'node',
@@ -173,7 +229,7 @@ onMounted(() => {
     maxZoom: 2,
   })
 
-  cy.nodeHtmlLabel([
+  cy.value.nodeHtmlLabel([
     {
       query: 'node',
       halign: 'center',
@@ -181,31 +237,29 @@ onMounted(() => {
       halignBox: 'center',
       valignBox: 'center',
       tpl: function (data) {
-        const node = cy.getElementById(data.id)
-        const isHighlighted = node.hasClass('highlighted')
-        return `<div class="object-node ${isHighlighted ? 'highlighted-node' : ''}">
+        if (cy.value) {
+          const node = cy.value.getElementById(data.id)
+          const isHighlighted = node.hasClass('highlighted')
+          const isHidden = node.hasClass('hidden')
+          return `<div class="object-node ${isHighlighted ? 'highlighted-node' : ''} ${isHidden ? 'hidden' : ''}">
                 <span class="object-label">${data.label}</span>
               </div>`
+        }
+        return ''
       },
     },
   ])
 
-  cy.zoom(zoomLevel.value)
-  cy.center()
+  cy.value.zoom(zoomLevel.value)
+  cy.value.center()
 
-  const slider = document.getElementById('zoom-slider') as HTMLInputElement
-  slider.addEventListener('input', () => {
-    zoomLevel.value = parseFloat(slider.value)
-    cy.zoom(zoomLevel.value)
-    cy.center()
+  cy.value.on('zoom', () => {
+    if (cy.value) {
+      zoomLevel.value = +cy.value.zoom().toFixed(2)
+    }
   })
 
-  cy.on('zoom', () => {
-    const slider = document.getElementById('zoom-slider') as HTMLInputElement
-    slider.value = cy.zoom().toString()
-  })
-
-  cy.on('mouseover', 'node', function (event) {
+  cy.value.on('mouseover', 'node', function (event) {
     const node = event.target
     node.addClass('highlighted')
     node.outgoers('edge').addClass('highlighted')
@@ -225,7 +279,7 @@ onMounted(() => {
     }
   })
 
-  cy.on('mouseout', 'node', function (event) {
+  cy.value.on('mouseout', 'node', function (event) {
     const node = event.target
     node.removeClass('highlighted')
     node.outgoers().removeClass('highlighted')
@@ -233,7 +287,7 @@ onMounted(() => {
     nodeTooltip.value.visible = false
   })
 
-  cy.on('mouseover', 'edge', function (event) {
+  cy.value.on('mouseover', 'edge', function (event) {
     const edge = event.target
     if (cyContainer.value) {
       edgeTooltip.value.details = edge.data('details')
@@ -250,19 +304,19 @@ onMounted(() => {
     }
   })
 
-  cy.on('mouseout', 'edge', function () {
+  cy.value.on('mouseout', 'edge', function () {
     edgeTooltip.value.visible = false
   })
 
-  cy.zoom(0.7)
-  cy.center()
+  cy.value.zoom(0.7)
+  cy.value.center()
 })
 </script>
 
 <style lang="scss">
 .container {
   position: relative;
-  height: 100%;
+  height: 90%;
   width: 100%;
   box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.49);
 }
@@ -308,5 +362,25 @@ onMounted(() => {
   border: 1px solid #dddddd;
   text-align: left;
   padding: 8px;
+}
+
+.lineage {
+  height: 100%;
+}
+
+.sliders-card {
+  height: 10%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slider-container {
+  width: 50%;
+  padding: 0 2rem;
+}
+
+.hidden {
+  display: none;
 }
 </style>

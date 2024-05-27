@@ -14,6 +14,6 @@ import AppBar from '~/components/modules/AppBar/organisms/AppBar.vue'
 <style lang="scss" scoped>
 .o-page {
   height: 100%;
-  margin: 4rem 10rem 0 10rem;
+  margin-top: 4rem;
 }
 </style>

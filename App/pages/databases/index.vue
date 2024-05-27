@@ -15,6 +15,7 @@
     </v-card-title>
     <v-data-table
       v-model:search="search"
+      class="databases-table"
       :loading="loading"
       :headers="[
         {
@@ -113,5 +114,10 @@ onBeforeUnmount(() => {
 <style lang="scss" scoped>
 .table-card {
   padding: 2rem;
+  height: 100%;
+}
+
+.databases-table {
+  height: 100%;
 }
 </style>
