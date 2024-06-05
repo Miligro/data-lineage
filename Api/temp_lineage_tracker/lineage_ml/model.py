@@ -11,7 +11,9 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from Levenshtein import distance as levenshtein_distance
 
-
+data_types = ['boolean', 'bytea', 'character', 'date', 'timestamp without time zone', 'numeric', 'double precision',
+              'real', 'integer', 'bigint', 'smallint', 'character varying',
+              'time without time zone', 'timestamp with time zone']
 true_relationships = {
     ('products', 'categories'): 1,
     ('orders', 'users'): 1,
@@ -111,7 +113,7 @@ true_relationships = {
 def predict_relationships(model, X_test, pairs):
     predictions = []
     for index, x in enumerate(X_test):
-        probability = model.predict_proba([[x[0], x[1]]])[0][1]
+        probability = model.predict_proba([x])[0][1]
         predictions.append((pairs[index], probability))
     return predictions
 
@@ -180,6 +182,7 @@ class ModelManager:
 
     def _analyze_data_type(self, metadata):
         data_type_counts = metadata.groupby(['table_name', 'data_type']).size().unstack(fill_value=0)
+        data_type_counts = data_type_counts.reindex(columns=data_types, fill_value=0)
         return data_type_counts
 
     def _prepare_training_data(self, metadata, name_lengths, columns_similarities, data_type_counts,
@@ -188,16 +191,23 @@ class ModelManager:
         y = []
         table_names = metadata['table_name'].unique()
         pairs = list(permutations(table_names, 2))
+        compared_pairs = []
         for pair in pairs:
-            label = true_relationships.get(pair, 0)
-            idx1 = columns_similarities.index.get_loc(pair[0])
-            idx2 = columns_similarities.columns.get_loc(pair[1])
-            name_distance = name_lengths.iloc[idx1] - name_lengths.iloc[idx2]
-            columns_similarity = columns_similarities.iloc[idx1, idx2]
-            data_types_diffs = abs(data_type_counts.loc[pair[0]] - data_type_counts.loc[pair[1]])
-            X.append([name_distance, columns_similarity] + data_types_diffs.tolist())
-            y.append(label)
-        return np.array(X), np.array(y), pairs
+            if (metadata[metadata['table_name'] == pair[0]].iloc[0]['oid'] <
+                    metadata[metadata['table_name'] == pair[1]].iloc[0]['oid']):
+                compared_pairs.append(pair)
+                label = true_relationships.get(pair, 0)
+                idx1 = columns_similarities.index.get_loc(pair[0])
+                idx2 = columns_similarities.columns.get_loc(pair[1])
+                name_distance = name_lengths.iloc[idx1] - name_lengths.iloc[idx2]
+                columns_similarity = columns_similarities.iloc[idx1, idx2]
+                tables_num_diff = abs(len(metadata[metadata['table_name'] == pair[0]]) - len(metadata[metadata['table_name'] == pair[1]]))
+                data_types_diffs = abs(data_type_counts.loc[pair[0]] - data_type_counts.loc[pair[1]])
+                X.append([name_distance, columns_similarity, tables_num_diff] + data_types_diffs.tolist())
+                y.append(label)
+        print(len(compared_pairs))
+        print(len(pairs))
+        return np.array(X), np.array(y), compared_pairs
 
     def train_model(self, true_relationships):
         metadata = self._get_metadata()
@@ -231,9 +241,9 @@ manager = ModelManager()
 X_test, pairs_test = manager.train_model(true_relationships)
 manager.save_model('models/forest.pkl')
 
-# predicted_relationships = predict_relationships(manager.model, X_test, pairs_test)
+predicted_relationships = predict_relationships(manager.model, X_test, pairs_test)
 # print(predicted_relationships)
-# visualize_relationships(predicted_relationships)
+visualize_relationships(predicted_relationships)
 
 # loaded_model = ModelManager.load_model('Api/temp_lineage_tracker/lineage_ml/models/forest.pkl')
 # predicted_relationships = predict_relationships(loaded_model, X_test, pairs_test)

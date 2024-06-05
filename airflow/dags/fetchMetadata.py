@@ -102,8 +102,7 @@ def manage_objects(**kwargs):
         connection.execute(objects_table.delete().where(objects_table.c.database_id == database_id))
         connection.execute(objects_table.insert(), data_dicts)
 
-    objects_df = pd.read_sql_table('objects', engine)
-    object_id_map = objects_df.set_index('name')['id'].to_dict()
+    object_id_map = get_objects_idx(engine, database_id)
 
     columns_details = []
     for (table_name, column_name, data_type, table_type) in metadata:
@@ -146,10 +145,15 @@ def manage_relationships(**kwargs):
         target_table = view[1]
         relationships.append({"source": source_view, "target": target_table})
 
+    relationships_details = []
     for routine in routines:
         procedure_name = routine[0]
         parser = SQLParser(routine[1])
-        objects = parser.extract_related_objects()
+        objects, columns = parser.extract_related_objects()
+        for relationship in columns:
+            if len(relationship) > 0:
+                relationships_details.append({"routine": procedure_name, "object": next(iter(relationship)),
+                                              "columns": relationship[next(iter(relationship))]})
         for obj in objects:
             if obj != procedure_name:
                 relationships.append({"source": procedure_name, "target": obj})
@@ -157,8 +161,7 @@ def manage_relationships(**kwargs):
     engine = get_lineage_database_engine()
     session = sessionmaker(bind=engine)()
 
-    objects_df = pd.read_sql_table('objects', engine)
-    object_id_map = objects_df.set_index('name')['id'].to_dict()
+    object_id_map = get_objects_idx(engine, database_id)
 
     unique_relationships = set()
     for rel in relationships:
@@ -170,14 +173,12 @@ def manage_relationships(**kwargs):
         target_id = object_id_map.get(target_name)
         if source_id is None or target_id is None:
             continue
-
         unique_relationships.add((
             database_id,
             source_id,
             target_id,
             connection_probability
         ))
-
     data_dicts = [
         {
             'database_id': database_id,
@@ -187,7 +188,6 @@ def manage_relationships(**kwargs):
         }
         for (database_id, source_id, target_id, connection_probability) in unique_relationships
     ]
-
     metadata_obj = MetaData(bind=engine)
     metadata_obj.reflect(only=['object_relationships'])
     relationships_table = Table('object_relationships', metadata_obj, autoload_with=engine)
@@ -196,7 +196,52 @@ def manage_relationships(**kwargs):
         connection.execute(relationships_table.delete().where(relationships_table.c.database_id == database_id))
         connection.execute(relationships_table.insert(), data_dicts)
 
+    object_id_map = get_relationships_idx(engine, database_id)
+
+    relationships_details_list = []
+    for relationship_detail in relationships_details:
+        relationship_id = object_id_map.get((relationship_detail["routine"], relationship_detail["object"]))
+        if relationship_id:
+            for column in relationship_detail["columns"]:
+                relationships_details_list.append({"database_id": database_id, "relation_id": relationship_id,
+                                                   "column_name": column})
+
+    metadata_obj = MetaData(bind=engine)
+    metadata_obj.reflect(only=['object_relationships_details'])
+    relationships_details_table = Table('object_relationships_details', metadata_obj, autoload_with=engine)
+
+    with engine.begin() as connection:
+        connection.execute(
+            relationships_details_table.delete().where(relationships_details_table.c.database_id == database_id))
+        connection.execute(relationships_details_table.insert(), relationships_details_list)
+
     session.close()
+
+
+def get_relationships_idx(engine, database_id):
+    read_object_relationships_query = "SELECT * FROM object_relationships WHERE database_id = %(database_id)s"
+    object_relationships_df = pd.read_sql_query(read_object_relationships_query, engine, params={"database_id": database_id})
+
+    read_objects_query = "SELECT * FROM objects WHERE database_id = %(database_id)s"
+    objects_df = pd.read_sql_query(read_objects_query, engine, params={"database_id": database_id})
+
+    merged_df = object_relationships_df.merge(objects_df, left_on='source_object_id', right_on='id',
+                                              suffixes=('', '_source'))
+    merged_df = merged_df.merge(objects_df, left_on='target_object_id', right_on='id', suffixes=('', '_target'))
+    result_df = merged_df[
+        ['id', 'source_object_id', 'name', 'target_object_id', 'name_target']]
+
+    object_id_map = result_df.set_index(['name', 'name_target'])['id'].to_dict()
+
+    return object_id_map
+
+
+def get_objects_idx(engine, database_id):
+    read_objects_query = "SELECT * FROM objects WHERE database_id = %(database_id)s"
+    objects_df = pd.read_sql_query(read_objects_query, engine, params={"database_id": database_id})
+    object_id_map = objects_df.set_index('name')['id'].to_dict()
+
+    return object_id_map
 
 
 def manage_relationships_details(**kwargs):
@@ -208,15 +253,7 @@ def manage_relationships_details(**kwargs):
 
     engine = get_lineage_database_engine()
     session = sessionmaker(bind=engine)()
-    object_relationships_df = pd.read_sql_table('object_relationships', engine)
-    objects_df = pd.read_sql_table('objects', engine)
-    merged_df = object_relationships_df.merge(objects_df, left_on='source_object_id', right_on='id',
-                                              suffixes=('', '_source'))
-    merged_df = merged_df.merge(objects_df, left_on='target_object_id', right_on='id', suffixes=('', '_target'))
-    result_df = merged_df[
-        ['id', 'source_object_id', 'name', 'target_object_id', 'name_target']]
-
-    object_id_map = result_df.set_index(['name', 'name_target'])['id'].to_dict()
+    object_id_map = get_relationships_idx(engine, database_id)
 
     relationships_details = []
     for constraint in constraints:
@@ -236,7 +273,6 @@ def manage_relationships_details(**kwargs):
     relationships_details_table = Table('object_relationships_details', metadata_obj, autoload_with=engine)
 
     with engine.begin() as connection:
-        connection.execute(relationships_details_table.delete().where(relationships_details_table.c.database_id == database_id))
         connection.execute(relationships_details_table.insert(), relationships_details)
 
     session.close()
@@ -268,14 +304,14 @@ def manage_relationships_by_model(**kwargs):
     engine = get_lineage_database_engine()
     session = sessionmaker(bind=engine)()
 
-    existing_relationships = pd.read_sql_table('object_relationships', engine)
+    read_object_relationships_query = "SELECT * FROM object_relationships WHERE database_id = %(database_id)s"
+    existing_relationships = pd.read_sql_query(read_object_relationships_query, engine, params={"database_id": database_id})
     existing_relationships_set = set(zip(
         existing_relationships['source_object_id'],
         existing_relationships['target_object_id']
     ))
 
-    objects_df = pd.read_sql_table('objects', engine)
-    object_id_map = objects_df.set_index('name')['id'].to_dict()
+    object_id_map = get_objects_idx(engine, database_id)
 
     new_relationships = []
     for (source, target), probability in predicts:

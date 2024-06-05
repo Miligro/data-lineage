@@ -667,3 +667,25 @@ BEGIN
     CALL create_cart_for_user(v_new_user_id);
 END;
 $$ LANGUAGE plpgsql;
+
+
+-- Do dodania
+-- CREATE TEMP TABLE temp_user_orders AS
+-- SELECT
+--     u.user_id,
+--     u.first_name,
+--     u.last_name,
+--     u.email,
+--     o.order_id,
+--     o.order_date,
+--     o.status,
+--     o.amount
+-- FROM
+--     users u
+-- JOIN
+--     orders o ON u.user_id = o.user_id
+-- WHERE
+--     u.registration_date > '2023-01-01' AND o.status = 'Completed';
+--
+-- CREATE TABLE user_orders AS
+-- SELECT * FROM temp_user_orders;

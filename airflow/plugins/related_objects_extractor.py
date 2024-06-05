@@ -1,6 +1,6 @@
 import sqlparse
 from sqlparse.tokens import DML, Keyword, Whitespace, Punctuation
-from sqlparse.sql import IdentifierList, Identifier, Function
+from sqlparse.sql import IdentifierList, Identifier, Function, Parenthesis, Comparison
 
 
 class SQLParser:
@@ -53,9 +53,64 @@ class SQLParser:
                         yield next_token
             i += 1
 
+    def _extract_procedures_columns(self, parsed):
+        table_columns = {}
+
+        i = 0
+        while i < len(parsed.tokens):
+            token = parsed.tokens[i]
+            if token.ttype is DML and token.value.upper() == 'INSERT':
+                while i < len(parsed.tokens) and parsed.tokens[i].ttype is not Keyword:
+                    i += 1
+                if i < len(parsed.tokens) and parsed.tokens[i].value.upper() == 'INTO':
+                    i += 1
+                    while (i < len(parsed.tokens) and
+                           (parsed.tokens[i].ttype is Whitespace or parsed.tokens[i].ttype is Punctuation)):
+                        i += 1
+                    table_token = parsed.tokens[i]
+                    table_name = table_token.get_real_name()
+                    table_columns[table_name] = []
+
+                    for token in table_token:
+                        if isinstance(token, Parenthesis):
+                            parenthesis = str(token).strip("()")
+                            columns = parenthesis.split(", ")
+                            table_columns[table_name] = [column.strip() for column in columns]
+            elif token.ttype is DML and token.value.upper() == 'UPDATE':
+                i += 1
+                while (i < len(parsed.tokens) and
+                       (parsed.tokens[i].ttype is Whitespace or parsed.tokens[i].ttype is Punctuation)):
+                    i += 1
+                table_token = parsed.tokens[i]
+                table_name = table_token.get_real_name()
+                table_columns[table_name] = []
+
+                while i < len(parsed.tokens) and parsed.tokens[i].ttype is not Keyword:
+                    i += 1
+                if i < len(parsed.tokens) and parsed.tokens[i].value.upper() == 'SET':
+                    i += 1
+                    while (i < len(parsed.tokens) and
+                           (parsed.tokens[i].ttype is Whitespace or parsed.tokens[i].ttype is Punctuation)):
+                        i += 1
+
+                    if isinstance(parsed.tokens[i], (IdentifierList, Comparison)):
+                        token = str(parsed.tokens[i])
+                        assignments = token.split(",")
+
+                        if len(assignments) > 1:
+                            table_columns[table_name] = [assignment.split("=")[0].strip() for assignment in assignments]
+                        else:
+                            table_columns[table_name] = [token.split("=")[0].strip()]
+            i += 1
+
+        return table_columns
+
     def extract_related_objects(self):
         results = []
+        columns = []
         for query in self.parsedQueries:
             stream = self._extract_from_part(query)
             results.extend(list(self._extract_identifiers(stream)))
-        return results
+            columns.append(self._extract_procedures_columns(query))
+        return results, columns
+
