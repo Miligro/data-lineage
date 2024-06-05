@@ -292,12 +292,16 @@ def manage_relationships_by_model(**kwargs):
 
     X_pred = []
     for pair in pairs:
-        idx1 = column_name_similarities.index.get_loc(pair[0])
-        idx2 = column_name_similarities.columns.get_loc(pair[1])
-        name_distance = table_name_lengths.iloc[idx1] - table_name_lengths.iloc[idx2]
-        columns_similarity = column_name_similarities.iloc[idx1, idx2]
-        data_types_diffs = (abs(data_type_counts.loc[pair[0]] - data_type_counts.loc[pair[1]])).tolist()
-        X_pred.append([name_distance, columns_similarity] + data_types_diffs)
+        if (metadata[metadata['table_name'] == pair[0]].iloc[0]['oid'] <
+                metadata[metadata['table_name'] == pair[1]].iloc[0]['oid']):
+            idx1 = column_name_similarities.index.get_loc(pair[0])
+            idx2 = column_name_similarities.columns.get_loc(pair[1])
+            name_distance = table_name_lengths.iloc[idx1] - table_name_lengths.iloc[idx2]
+            columns_similarity = column_name_similarities.iloc[idx1, idx2]
+            tables_num_diff = abs(
+                len(metadata[metadata['table_name'] == pair[0]]) - len(metadata[metadata['table_name'] == pair[1]]))
+            data_types_diffs = (abs(data_type_counts.loc[pair[0]] - data_type_counts.loc[pair[1]])).tolist()
+            X_pred.append([name_distance, columns_similarity, tables_num_diff] + data_types_diffs)
 
     predicts = predict_relationships(model, np.array(X_pred), pairs)
 
