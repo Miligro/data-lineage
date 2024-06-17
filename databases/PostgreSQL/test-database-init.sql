@@ -19,23 +19,23 @@ CREATE TABLE insurance (
     coverage_details TEXT
 );
 
+CREATE TABLE departments (
+    department_id SERIAL PRIMARY KEY,
+    department_name VARCHAR(50),
+    location VARCHAR(100)
+);
+
 CREATE TABLE staff (
     staff_id SERIAL PRIMARY KEY,
     first_name VARCHAR(50),
     last_name VARCHAR(50),
     role VARCHAR(50),
-    department_id INT,
+    department_id INT REFERENCES departments(department_id),
     phone VARCHAR(15),
     email VARCHAR(100),
     address TEXT,
     date_of_joining DATE,
     salary NUMERIC(10, 2)
-);
-
-CREATE TABLE departments (
-    department_id SERIAL PRIMARY KEY,
-    department_name VARCHAR(50),
-    location VARCHAR(100)
 );
 
 CREATE TABLE shifts (
@@ -45,6 +45,8 @@ CREATE TABLE shifts (
     start_time TIME,
     end_time TIME
 );
+
+
 
 CREATE TABLE appointments (
     appointment_id SERIAL PRIMARY KEY,
@@ -135,6 +137,21 @@ CREATE TABLE order_items (
     quantity INT,
     unit_price NUMERIC(10, 2)
 );
+
+CREATE VIEW prescription_details AS
+SELECT
+    pr.prescription_id,
+    mr.record_id,
+    mr.patient_id,
+    mr.staff_id,
+    pr.medication_name,
+    pr.dosage,
+    pr.frequency,
+    pr.duration
+FROM
+    prescriptions pr
+JOIN
+    medical_records mr ON pr.record_id = mr.record_id;
 
 CREATE VIEW patient_appointments AS
 SELECT
@@ -707,3 +724,49 @@ BEGIN
     DROP TABLE IF EXISTS temp_patient_data;
 END;
 $$;
+
+CREATE TEMPORARY TABLE shift_temp AS SELECT
+st.first_name, st.last_name, sh.start_time, sh.end_time, st.department_id
+FROM staff st JOIN shifts sh ON st.staff_id = sh.staff_id;
+
+CREATE TABLE staff_first_shift AS SELECT st.*, d.location
+FROM shift_temp st JOIN departments d ON st.department_id = d.department_id;
+
+CREATE TEMPORARY TABLE temp_patients_appointments AS
+SELECT
+    p.patient_id,
+    p.first_name,
+    p.last_name,
+    pa.appointment_id,
+    pa.appointment_date,
+    pa.appointment_time,
+    pa.reason,
+    pa.status
+FROM
+    patients p
+JOIN
+    patient_appointments pa ON p.patient_id = pa.patient_id
+WHERE
+    pa.status = 'Scheduled';
+
+CREATE TABLE patients_scheduled_appointments AS
+SELECT
+    t.patient_id,
+    t.first_name,
+    t.last_name,
+    t.appointment_id,
+    t.appointment_date,
+    t.appointment_time,
+    t.reason,
+    t.status,
+    s.first_name AS staff_first_name,
+    s.last_name AS staff_last_name,
+    s.role AS staff_role
+FROM
+    temp_patients_appointments t
+JOIN
+    appointments a ON t.appointment_id = a.appointment_id
+JOIN
+    staff s ON a.staff_id = s.staff_id
+WHERE
+    s.role = 'Doctor';
