@@ -52,7 +52,7 @@ def analyze_column_idx(metadata):
         for other_table in tables:
             idx_similarities = 0
             for col in table_columns['column_name']:
-                if jaro_winkler_similarity(col, other_table) > 0.8:
+                if jaro_winkler_similarity(col, other_table) > 0.9:
                     idx_similarities += 1
             similarities[table][other_table] = idx_similarities
     return pd.DataFrame(similarities)
