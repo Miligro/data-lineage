@@ -19,9 +19,9 @@
         >
         <v-slider
           v-model="thresholdLevel"
-          :min="1"
-          :max="100"
-          :step="0.5"
+          :min="0.01"
+          :max="1"
+          :step="0.01"
           hide-details
           @update:model-value="onThresholdChange"
         />
@@ -134,37 +134,45 @@ const edgeTooltip = ref({
 const cyContainer = ref<HTMLElement | null>(null)
 const cy = ref<Core | null>(null)
 const zoomLevel = ref(1.0)
-const thresholdLevel = ref(1.0)
+const thresholdLevel = ref(0.15)
 const relationships = ref<Array<ElementDefinition>>([])
+const relationshipsResponse = ref<ObjectRelationshipsResponseInterface | null>(
+  null
+)
 
-const relationshipsResponse =
-  await useApiFetch<ObjectRelationshipsResponseInterface>(
-    `/databases/${props.databaseId}/objects/${props.objectId}/relationships`
-  )
-relationships.value = relationshipsResponse.relationships
+const onThresholdChange = (value: number = 0.15) => {
+  if (relationshipsResponse.value) {
+    relationships.value = relationshipsResponse.value.relationships.filter(
+      (relationship) => {
+        return !!(
+          (relationship.data.connection_probability &&
+            relationship.data.connection_probability > value) ||
+          relationship.data.connection_probability === undefined
+        )
+      }
+    )
 
-const onThresholdChange = (value: number) => {
-  relationships.value = relationshipsResponse.relationships.filter(
-    (relationship) => {
-      return !!(
-        (relationship.data.connection_probability &&
-          relationship.data.connection_probability > value / 100) ||
-        relationship.data.connection_probability === undefined
-      )
+    if (cy.value) {
+      cy.value.json({ elements: relationships.value })
+      cy.value
+        .nodes()
+        .filter((node) => {
+          return node.connectedEdges().length === 0
+        })
+        .remove()
+      cy.value.layout({ name: 'breadthfirst' }).run()
+      cy.value.fit()
     }
-  )
-
-  if (cy.value) {
-    cy.value.json({ elements: relationships.value })
-    cy.value
-      .nodes()
-      .filter((node) => {
-        return node.connectedEdges().length === 0
-      })
-      .remove()
-    cy.value.layout({ name: 'breadthfirst' }).run()
-    cy.value.fit()
   }
+}
+
+const init = async () => {
+  relationshipsResponse.value =
+    await useApiFetch<ObjectRelationshipsResponseInterface>(
+      `/databases/${props.databaseId}/objects/${props.objectId}/relationships`
+    )
+  relationships.value = relationshipsResponse.value.relationships
+  onThresholdChange()
 }
 
 const onZoomChange = (value: number) => {
@@ -175,6 +183,7 @@ const onZoomChange = (value: number) => {
 }
 
 onMounted(() => {
+  init()
   if (!cyContainer.value) return
 
   cy.value = cytoscape({

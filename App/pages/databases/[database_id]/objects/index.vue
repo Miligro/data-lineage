@@ -14,6 +14,7 @@
     </v-card-title>
     <v-data-table
       v-model:search="search"
+      class="databases-table"
       :loading="loading"
       :headers="[
         {
@@ -80,7 +81,13 @@ fetchObjects()
 
 <style lang="scss" scoped>
 .table-card {
-  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem 2rem 0 2rem;
+  height: 100%;
+}
+
+.databases-table {
   height: 100%;
 }
 </style>
