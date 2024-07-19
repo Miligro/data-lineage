@@ -1,6 +1,7 @@
 import yaml
 import numpy as np
 import pandas as pd
+import os
 
 from model import *
 from airflow import DAG
@@ -16,17 +17,20 @@ from sqlserver_management import SQLServerDatabaseManagement
 
 
 def get_lineage_database_engine():
-    with open('/opt/airflow/config/lineage-database.yml', 'r') as file:
-        config = yaml.safe_load(file)
-        engine = create_engine(
-            f'postgresql+psycopg2://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{config['db_name']}')
-        return engine
+    user = os.environ.get("LINEAGE_DATABASE_USER")
+    password = os.environ.get("LINEAGE_DATABASE_PASSWORD")
+    db = os.environ.get("LINEAGE_DATABASE_DB")
+    host = os.environ.get("LINEAGE_DATABASE_HOST")
+    port = os.environ.get("LINEAGE_DATABASE_PORT")
+    engine = create_engine(
+        f'postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}')
+    return engine
 
 
 def get_database_manager(**kwargs):
     database_id = kwargs['dag_run'].conf.get('database_id')
     database_config = None
-    with open('/opt/airflow/config/databases.yml', 'r') as file:
+    with open('/opt/airflow/databases-config/databases.yml', 'r') as file:
         config = yaml.safe_load(file)
         databases = config['databases']
         for db in databases:

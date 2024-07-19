@@ -116,7 +116,7 @@ class ListObjectRelationshipsView(View):
         return JsonResponse(response_data)
 
 
-AIRFLOW_URL = 'http://localhost:8080/api/v1/dags/{dag_id}/dagRuns'
+AIRFLOW_URL = 'http://lineage-airflow-webserver-1:8080/api/v1/dags/{dag_id}/dagRuns'
 AIRFLOW_USERNAME = 'airflow'
 AIRFLOW_PASSWORD = 'airflow'
 
@@ -159,7 +159,7 @@ class LineageModelView(View):
 
 class LoadDatabasesView(View):
     def post(self, request):
-        with open('lineage-databases/databases.yml', 'r') as file:
+        with open('databases-config/databases.yml', 'r') as file:
             config = yaml.safe_load(file)
             databases = config['databases']
             for db in databases:
