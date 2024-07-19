@@ -228,6 +228,12 @@ CREATE TABLE newsletters (
     subscription_date DATE
 );
 
+CREATE TABLE warehouses (
+    warehouse_id INT PRIMARY KEY,
+    name VARCHAR(100),
+    address VARCHAR(255)
+);
+
 CREATE TABLE shipment_types (
     shipment_type_id INT PRIMARY KEY,
     name VARCHAR(50),

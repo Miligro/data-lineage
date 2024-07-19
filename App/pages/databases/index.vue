@@ -105,7 +105,7 @@ onBeforeMount(() => {
   fetchDatabaseInterval.value = setInterval(() => fetchDatabases(), 10000)
 })
 onBeforeUnmount(() => {
-  if (fetchDatabaseInterval) {
+  if (fetchDatabaseInterval.value) {
     clearInterval(fetchDatabaseInterval.value)
   }
 })
@@ -113,7 +113,9 @@ onBeforeUnmount(() => {
 
 <style lang="scss" scoped>
 .table-card {
-  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem 2rem 0 2rem;
   height: 100%;
 }
 

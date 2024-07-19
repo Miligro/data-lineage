@@ -1,17 +1,18 @@
-from itertools import permutations
+import yaml
+import numpy as np
+import pandas as pd
+
+from model import *
 from airflow import DAG
-from airflow.operators.python import PythonOperator
 from datetime import datetime
-from sqlalchemy import create_engine, MetaData, Table
+from itertools import permutations
 from sqlalchemy.orm import sessionmaker
+from related_objects_extractor import SQLParser
+from airflow.operators.python import PythonOperator
+from sqlalchemy import create_engine, MetaData, Table
+from oracle_management import OracleDatabaseManagement
 from postgres_management import PostgresDatabaseManagement
 from sqlserver_management import SQLServerDatabaseManagement
-from oracle_management import OracleDatabaseManagement
-from related_objects_extractor import SQLParser
-from model import *
-import pandas as pd
-import numpy as np
-import yaml
 
 
 def get_lineage_database_engine():
@@ -61,6 +62,31 @@ def get_database_manager(**kwargs):
             return db_manager
     return None
 
+
+def get_relationships_idx(engine, database_id):
+    read_object_relationships_query = "SELECT * FROM object_relationships WHERE database_id = %(database_id)s"
+    object_relationships_df = pd.read_sql_query(read_object_relationships_query, engine, params={"database_id": database_id})
+
+    read_objects_query = "SELECT * FROM objects WHERE database_id = %(database_id)s"
+    objects_df = pd.read_sql_query(read_objects_query, engine, params={"database_id": database_id})
+
+    merged_df = object_relationships_df.merge(objects_df, left_on='source_object_id', right_on='id',
+                                              suffixes=('', '_source'))
+    merged_df = merged_df.merge(objects_df, left_on='target_object_id', right_on='id', suffixes=('', '_target'))
+    result_df = merged_df[
+        ['id', 'source_object_id', 'name', 'target_object_id', 'name_target']]
+
+    object_id_map = result_df.set_index(['name', 'name_target'])['id'].to_dict()
+
+    return object_id_map
+
+
+def get_objects_idx(engine, database_id):
+    read_objects_query = "SELECT * FROM objects WHERE database_id = %(database_id)s"
+    objects_df = pd.read_sql_query(read_objects_query, engine, params={"database_id": database_id})
+    object_id_map = objects_df.set_index('name')['id'].to_dict()
+
+    return object_id_map
 
 def update_status_to_django(status, **kwargs):
     database_id = kwargs['dag_run'].conf.get('database_id')
@@ -138,12 +164,12 @@ def manage_relationships(**kwargs):
     relationships = []
     for constraint in constraints:
         source = constraint[0]
-        target = constraint[3]
+        target = constraint[2]
         relationships.append({"source": source, "target": target})
     for view in views:
-        source_view = view[0]
-        target_table = view[1]
-        relationships.append({"source": source_view, "target": target_table})
+        target_view = view[0]
+        source_table = view[1]
+        relationships.append({"source": source_table, "target": target_view})
 
     relationships_details = []
     for routine in routines:
@@ -218,32 +244,6 @@ def manage_relationships(**kwargs):
     session.close()
 
 
-def get_relationships_idx(engine, database_id):
-    read_object_relationships_query = "SELECT * FROM object_relationships WHERE database_id = %(database_id)s"
-    object_relationships_df = pd.read_sql_query(read_object_relationships_query, engine, params={"database_id": database_id})
-
-    read_objects_query = "SELECT * FROM objects WHERE database_id = %(database_id)s"
-    objects_df = pd.read_sql_query(read_objects_query, engine, params={"database_id": database_id})
-
-    merged_df = object_relationships_df.merge(objects_df, left_on='source_object_id', right_on='id',
-                                              suffixes=('', '_source'))
-    merged_df = merged_df.merge(objects_df, left_on='target_object_id', right_on='id', suffixes=('', '_target'))
-    result_df = merged_df[
-        ['id', 'source_object_id', 'name', 'target_object_id', 'name_target']]
-
-    object_id_map = result_df.set_index(['name', 'name_target'])['id'].to_dict()
-
-    return object_id_map
-
-
-def get_objects_idx(engine, database_id):
-    read_objects_query = "SELECT * FROM objects WHERE database_id = %(database_id)s"
-    objects_df = pd.read_sql_query(read_objects_query, engine, params={"database_id": database_id})
-    object_id_map = objects_df.set_index('name')['id'].to_dict()
-
-    return object_id_map
-
-
 def manage_relationships_details(**kwargs):
     database_id = kwargs['dag_run'].conf.get('database_id')
     db_manager = get_database_manager(**kwargs)
@@ -263,7 +263,7 @@ def manage_relationships_details(**kwargs):
                                           "column_name": constraint[3]})
 
     for view in views:
-        relationship_id = object_id_map.get((view[0], view[1]))
+        relationship_id = object_id_map.get((view[1], view[0]))
         if relationship_id:
             relationships_details.append({"database_id": database_id, "relation_id": relationship_id,
                                           "column_name": view[2]})
@@ -285,25 +285,25 @@ def manage_relationships_by_model(**kwargs):
     metadata = db_manager.fetch_metadata_for_model()
     table_names = metadata['table_name'].unique()
     pairs = list(permutations(table_names, 2))
-    table_name_lengths = analyze_table_names(metadata)
+    table_names_similarities = analyze_table_names(metadata)
     column_name_similarities = analyze_column_names(metadata)
-    data_type_counts = analyze_data_type(metadata)
+    table_idx_similarities = analyze_column_idx(metadata)
     model = load_model('/opt/airflow/plugins/forest.pkl')
 
     X_pred = []
+    pairs_pred = []
     for pair in pairs:
         if (metadata[metadata['table_name'] == pair[0]].iloc[0]['oid'] <
                 metadata[metadata['table_name'] == pair[1]].iloc[0]['oid']):
+            pairs_pred.append(pair)
             idx1 = column_name_similarities.index.get_loc(pair[0])
             idx2 = column_name_similarities.columns.get_loc(pair[1])
-            name_distance = table_name_lengths.iloc[idx1] - table_name_lengths.iloc[idx2]
+            names_similarity = table_names_similarities.iloc[idx1, idx2]
             columns_similarity = column_name_similarities.iloc[idx1, idx2]
-            tables_num_diff = abs(
-                len(metadata[metadata['table_name'] == pair[0]]) - len(metadata[metadata['table_name'] == pair[1]]))
-            data_types_diffs = (abs(data_type_counts.loc[pair[0]] - data_type_counts.loc[pair[1]])).tolist()
-            X_pred.append([name_distance, columns_similarity, tables_num_diff] + data_types_diffs)
+            idx_similarity = table_idx_similarities.iloc[idx1, idx2]
+            X_pred.append([names_similarity, columns_similarity, idx_similarity])
 
-    predicts = predict_relationships(model, np.array(X_pred), pairs)
+    predicts = predict_relationships(model, np.array(X_pred), pairs_pred)
 
     engine = get_lineage_database_engine()
     session = sessionmaker(bind=engine)()
@@ -329,7 +329,7 @@ def manage_relationships_by_model(**kwargs):
                     'database_id': database_id,
                     'source_object_id': source_id,
                     'target_object_id': target_id,
-                    'connection_probability': probability
+                    'connection_probability': round(probability.astype(float), 3)
                 })
 
     if new_relationships:

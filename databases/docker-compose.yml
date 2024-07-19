@@ -25,6 +25,17 @@ services:
     volumes:
       - ./PostgreSQL/test-database-init.sql:/docker-entrypoint-initdb.d/init.sql
 
+  postgres-train:
+    image: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: finance
+    ports:
+      - "5435:5432"
+    volumes:
+      - ./PostgreSQL/train-database-init.sql:/docker-entrypoint-initdb.d/init.sql
+
   sqlserver-test:
     build: ./SQLServer
     environment:
