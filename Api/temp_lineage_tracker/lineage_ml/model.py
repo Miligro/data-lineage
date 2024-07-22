@@ -1,7 +1,6 @@
 import pickle
 import numpy as np
 import pandas as pd
-import xgboost as xgb
 
 from itertools import permutations
 from collections import defaultdict
@@ -128,9 +127,6 @@ class ModelManager:
 
         self.model = RandomForestClassifier(n_estimators=200, min_samples_split=200, min_samples_leaf=10, max_depth=14,
                                             max_features='log2', criterion='gini', bootstrap=False)
-
-        # self.model = xgb.XGBClassifier(subsample=1.0, n_estimators=300, min_child_weight=10, max_depth=10,
-        #                                learning_rate=0.01, colsample_bytree=0.6)
 
         self.model.fit(X_weighted, y)
 

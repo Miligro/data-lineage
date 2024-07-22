@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 import os
 from pathlib import Path
 
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -26,7 +27,9 @@ SECRET_KEY = "django-insecure-(czmu%ifw8iog8_o)@@56yl#@z^co*1*9n1#0!!r2cgx+t9_x*
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'lineage-api-1'
+]
 
 
 # Application definition
@@ -54,6 +57,7 @@ MIDDLEWARE = [
 
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
+    'http://lineage-app-1:3000',
 ]
 
 ROOT_URLCONF = "temp_lineage_tracker.urls"
@@ -83,38 +87,11 @@ WSGI_APPLICATION = "temp_lineage_tracker.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "LineageManagement",
-        "USER": "postgres",
-        "PASSWORD": "postgres",
-        "HOST": "localhost",
-        "PORT": 5431,
-    },
-    "postgres": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "online_store",
-        "USER": "postgres",
-        "PASSWORD": "postgres",
-        "HOST": "localhost",
-        "PORT": 5432,
-    },
-    "sqlserver": {
-        "ENGINE": "mssql",
-        "NAME": "bank",
-        "USER": "SA",
-        "PASSWORD": "Mysecretpassword123!",
-        "HOST": "localhost",
-        "PORT": 1433,
-        "OPTIONS": {
-            "driver": "ODBC Driver 17 for SQL Server",
-        },
-    },
-    "oracle": {
-        "ENGINE": "django.db.backends.oracle",
-        "NAME": "XE",
-        "USER": "c##data_lineage",
-        "PASSWORD": "Mysecretpassword123!",
-        "HOST": "localhost",
-        "PORT": 1521,
+        "NAME": os.environ.get("DB_NAME"),
+        "USER": os.environ.get("DB_USER"),
+        "PASSWORD": os.environ.get("DB_PASSWORD"),
+        "HOST": os.environ.get("DB_HOST"),
+        "PORT": os.environ.get("DB_PORT"),
     },
 }
 

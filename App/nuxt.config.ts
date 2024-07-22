@@ -1,13 +1,12 @@
 import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
+import { rewriteDefault } from 'vue/compiler-sfc'
 
 export default defineNuxtConfig({
   build: {
     transpile: ['vuetify'],
   },
-  runtimeConfig: {
-    public: {
-      baseURL: 'http://localhost:8080',
-    },
+  routeRules: {
+    "/api/**": { proxy: 'http://lineage-api-1:8000/**' }
   },
   plugins: ['~/plugins/vuetify'],
   modules: [
