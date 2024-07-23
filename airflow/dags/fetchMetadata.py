@@ -116,7 +116,7 @@ def manage_objects(**kwargs):
     db_manager.close()
 
     objects = (list({(row[0], row[3]) for row in metadata}) + list({(row[0], row[2]) for row in routines}))
-    objects_records = [{'database_id': database_id, 'name': tab, 'type': tab_type}
+    objects_records = [{'database_id': database_id, 'name': tab.upper(), 'type': tab_type}
                        for tab, tab_type in objects]
 
     engine = get_lineage_database_engine()
@@ -127,21 +127,21 @@ def manage_objects(**kwargs):
     metadata_obj.reflect(only=['objects'])
     objects_table = Table('objects', metadata_obj, autoload_with=engine)
     data_dicts = objects_records_df.to_dict('records')
-
-    with engine.begin() as connection:
-        connection.execute(objects_table.delete().where(objects_table.c.database_id == database_id))
-        connection.execute(objects_table.insert(), data_dicts)
+    if data_dicts:
+        with engine.begin() as connection:
+            connection.execute(objects_table.delete().where(objects_table.c.database_id == database_id))
+            connection.execute(objects_table.insert(), data_dicts)
 
     object_id_map = get_objects_idx(engine, database_id)
 
     columns_details = []
     for (table_name, column_name, data_type, table_type) in metadata:
-        object_id = object_id_map.get(table_name)
+        object_id = object_id_map.get(table_name.upper())
         if object_id:
             columns_details.append({
                 'database_id': database_id,
                 'object_id': object_id,
-                'column_name': column_name,
+                'column_name': column_name.upper(),
                 'column_type': data_type
             })
 
@@ -150,9 +150,10 @@ def manage_objects(**kwargs):
     object_details_table = Table('object_details', metadata_obj, autoload_with=engine)
     details_data_dicts = object_details_df.to_dict('records')
 
-    with engine.begin() as connection:
-        connection.execute(object_details_table.delete().where(object_details_table.c.database_id == database_id))
-        connection.execute(object_details_table.insert(), details_data_dicts)
+    if(details_data_dicts):
+        with engine.begin() as connection:
+            connection.execute(object_details_table.delete().where(object_details_table.c.database_id == database_id))
+            connection.execute(object_details_table.insert(), details_data_dicts)
 
     session.close()
 
@@ -164,16 +165,15 @@ def manage_relationships(**kwargs):
     views = db_manager.fetch_view_dependencies()
     routines = db_manager.fetch_routines()
     db_manager.close()
-
     relationships = []
     for constraint in constraints:
         source = constraint[0]
         target = constraint[2]
-        relationships.append({"source": source, "target": target})
+        relationships.append({"source": source.upper(), "target": target.upper()})
     for view in views:
         target_view = view[0]
         source_table = view[1]
-        relationships.append({"source": source_table, "target": target_view})
+        relationships.append({"source": source_table.upper(), "target": target_view.upper()})
 
     relationships_details = []
     for routine in routines:
@@ -182,11 +182,11 @@ def manage_relationships(**kwargs):
         objects, columns = parser.extract_related_objects()
         for relationship in columns:
             if len(relationship) > 0:
-                relationships_details.append({"routine": procedure_name, "object": next(iter(relationship)),
+                relationships_details.append({"routine": procedure_name.upper(), "object": next(iter(relationship)).upper(),
                                               "columns": relationship[next(iter(relationship))]})
         for obj in objects:
             if obj != procedure_name:
-                relationships.append({"source": procedure_name, "target": obj})
+                relationships.append({"source": procedure_name.upper(), "target": obj.upper()})
 
     engine = get_lineage_database_engine()
     session = sessionmaker(bind=engine)()
@@ -199,8 +199,8 @@ def manage_relationships(**kwargs):
         target_name = rel['target']
         connection_probability = 1
 
-        source_id = object_id_map.get(source_name)
-        target_id = object_id_map.get(target_name)
+        source_id = object_id_map.get(source_name.upper())
+        target_id = object_id_map.get(target_name.upper())
         if source_id is None or target_id is None:
             continue
         unique_relationships.add((
@@ -222,9 +222,10 @@ def manage_relationships(**kwargs):
     metadata_obj.reflect(only=['object_relationships'])
     relationships_table = Table('object_relationships', metadata_obj, autoload_with=engine)
 
-    with engine.begin() as connection:
-        connection.execute(relationships_table.delete().where(relationships_table.c.database_id == database_id))
-        connection.execute(relationships_table.insert(), data_dicts)
+    if data_dicts:
+        with engine.begin() as connection:
+            connection.execute(relationships_table.delete().where(relationships_table.c.database_id == database_id))
+            connection.execute(relationships_table.insert(), data_dicts)
 
     object_id_map = get_relationships_idx(engine, database_id)
 
@@ -235,15 +236,16 @@ def manage_relationships(**kwargs):
             for column in relationship_detail["columns"]:
                 relationships_details_list.append({"database_id": database_id, "relation_id": relationship_id,
                                                    "column_name": column})
+                
+    if relationships_details_list:
+        metadata_obj = MetaData(bind=engine)
+        metadata_obj.reflect(only=['object_relationships_details'])
+        relationships_details_table = Table('object_relationships_details', metadata_obj, autoload_with=engine)
 
-    metadata_obj = MetaData(bind=engine)
-    metadata_obj.reflect(only=['object_relationships_details'])
-    relationships_details_table = Table('object_relationships_details', metadata_obj, autoload_with=engine)
-
-    with engine.begin() as connection:
-        connection.execute(
-            relationships_details_table.delete().where(relationships_details_table.c.database_id == database_id))
-        connection.execute(relationships_details_table.insert(), relationships_details_list)
+        with engine.begin() as connection:
+            connection.execute(
+                relationships_details_table.delete().where(relationships_details_table.c.database_id == database_id))
+            connection.execute(relationships_details_table.insert(), relationships_details_list)
 
     session.close()
 
@@ -261,23 +263,24 @@ def manage_relationships_details(**kwargs):
 
     relationships_details = []
     for constraint in constraints:
-        relationship_id = object_id_map.get((constraint[0], constraint[2]))
+        relationship_id = object_id_map.get((constraint[0].upper(), constraint[2].upper()))
         if relationship_id:
             relationships_details.append({"database_id": database_id, "relation_id": relationship_id,
-                                          "column_name": constraint[3]})
+                                          "column_name": constraint[3].upper()})
 
     for view in views:
-        relationship_id = object_id_map.get((view[1], view[0]))
+        relationship_id = object_id_map.get((view[1].upper(), view[0].upper()))
         if relationship_id:
             relationships_details.append({"database_id": database_id, "relation_id": relationship_id,
-                                          "column_name": view[2]})
+                                          "column_name": view[2].upper()})
 
-    metadata_obj = MetaData(bind=engine)
-    metadata_obj.reflect(only=['object_relationships_details'])
-    relationships_details_table = Table('object_relationships_details', metadata_obj, autoload_with=engine)
+    if relationships_details:
+        metadata_obj = MetaData(bind=engine)
+        metadata_obj.reflect(only=['object_relationships_details'])
+        relationships_details_table = Table('object_relationships_details', metadata_obj, autoload_with=engine)
 
-    with engine.begin() as connection:
-        connection.execute(relationships_details_table.insert(), relationships_details)
+        with engine.begin() as connection:
+            connection.execute(relationships_details_table.insert(), relationships_details)
 
     session.close()
 
