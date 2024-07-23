@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+import pandas as pd
 
 
 class OracleDatabaseManagement:
@@ -92,8 +93,8 @@ class OracleDatabaseManagement:
     def fetch_routines(self):
         query = """
         SELECT
-            name as object_name,
-            text as routine_definition,
+            name as routine_name,
+            LISTAGG(text, ' ') WITHIN GROUP (ORDER BY line) as routine_definition,
             type as routine_type
         FROM
             all_source
@@ -103,6 +104,8 @@ class OracleDatabaseManagement:
             AND NOT (owner LIKE '%ADMIN%' OR owner LIKE 'ADMIN%' OR owner LIKE '%ADMIN')
             AND NOT (owner LIKE '%DBS%' OR owner LIKE 'DBS%' OR owner LIKE '%DBS')
             AND owner NOT IN ('OUTLN', 'XDB', 'REMOTE_SCHEDULER_AGENT', 'DVF')
+        GROUP BY
+            name, type
         """
         result = self.engine.execute(query).fetchall()
         return result
@@ -128,4 +131,4 @@ class OracleDatabaseManagement:
             AND cols.owner NOT IN ('OUTLN', 'XDB', 'REMOTE_SCHEDULER_AGENT', 'DVF')
         """
         result = self.engine.execute(query).fetchall()
-        return result
+        return pd.DataFrame(result, columns=['table_name', 'column_name', 'data_type', 'oid'])
