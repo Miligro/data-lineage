@@ -182,6 +182,17 @@ const onZoomChange = (value: number) => {
   }
 }
 
+const fetchNodeRelationships = async (nodeId: number | string) => {
+  const data = await useApiFetch<ObjectRelationshipsResponseInterface>(
+    `/databases/${props.databaseId}/objects/${nodeId}/relationships`
+  )
+  if (relationshipsResponse.value) {
+    relationshipsResponse.value.relationships =
+      relationshipsResponse.value.relationships.concat(data.relationships)
+  }
+  onThresholdChange()
+}
+
 onMounted(() => {
   init()
   if (!cyContainer.value) return
@@ -249,8 +260,7 @@ onMounted(() => {
         if (cy.value) {
           const node = cy.value.getElementById(data.id)
           const isHighlighted = node.hasClass('highlighted')
-          const isHidden = node.hasClass('hidden')
-          return `<div class="object-node ${isHighlighted ? 'highlighted-node' : ''} ${isHidden ? 'hidden' : ''}">
+          return `<div class="object-node ${isHighlighted ? 'highlighted-node' : ''}">
                 <span class="object-label">${data.label}</span>
               </div>`
         }
@@ -294,6 +304,11 @@ onMounted(() => {
     node.outgoers().removeClass('highlighted')
     node.outgoers('edge').removeClass('highlighted')
     nodeTooltip.value.visible = false
+  })
+
+  cy.value.on('click', 'node', (event) => {
+    const nodeId = event.target.data('id')
+    fetchNodeRelationships(nodeId)
   })
 
   cy.value.on('mouseover', 'edge', function (event) {
@@ -387,9 +402,5 @@ onMounted(() => {
 .slider-container {
   width: 50%;
   padding: 0 2rem;
-}
-
-.hidden {
-  display: none;
 }
 </style>

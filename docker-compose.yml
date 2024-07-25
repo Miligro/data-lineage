@@ -242,6 +242,9 @@ services:
       DB_PASSWORD: postgres
       DB_HOST: api-db
       DB_PORT: 5432
+      AIRFLOW_BASE_URL: http://lineage-airflow-webserver-1:8080 
+      AIRFLOW_USERNAME: airflow 
+      AIRFLOW_PASSWORD: airflow 
     networks:
       - lineage-network
 

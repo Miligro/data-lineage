@@ -28,7 +28,8 @@ SECRET_KEY = "django-insecure-(czmu%ifw8iog8_o)@@56yl#@z^co*1*9n1#0!!r2cgx+t9_x*
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    'lineage-api-1'
+    'lineage-api-1',
+    '127.0.0.1'
 ]
 
 
@@ -57,6 +58,7 @@ MIDDLEWARE = [
 
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
+    'http://localhost:3001',
     'http://lineage-app-1:3000',
 ]
 

@@ -167,8 +167,8 @@ def manage_relationships(**kwargs):
     db_manager.close()
     relationships = []
     for constraint in constraints:
-        source = constraint[0]
-        target = constraint[2]
+        source = constraint[2]
+        target = constraint[0]
         relationships.append({"source": source.upper(), "target": target.upper()})
     for view in views:
         target_view = view[0]
@@ -263,7 +263,7 @@ def manage_relationships_details(**kwargs):
 
     relationships_details = []
     for constraint in constraints:
-        relationship_id = object_id_map.get((constraint[0].upper(), constraint[2].upper()))
+        relationship_id = object_id_map.get((constraint[2].upper(), constraint[0].upper()))
         if relationship_id:
             relationships_details.append({"database_id": database_id, "relation_id": relationship_id,
                                           "column_name": constraint[3].upper()})
@@ -327,8 +327,8 @@ def manage_relationships_by_model(**kwargs):
     new_relationships = []
     for (source, target), probability in predicts:
         if probability > 0.0:
-            source_id = object_id_map.get(source)
-            target_id = object_id_map.get(target)
+            source_id = object_id_map.get(source.upper())
+            target_id = object_id_map.get(target.upper())
             if source_id is None or target_id is None:
                 continue
             if (source_id, target_id) not in existing_relationships_set:
