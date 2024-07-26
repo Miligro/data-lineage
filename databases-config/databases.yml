@@ -1,4 +1,12 @@
 databases:
+  - id: scenarios-database
+    type: postgres
+    name: Scenarios Database
+    host: lineage-databases-scenarios-database-1
+    port: 5432
+    user: postgres
+    password: postgres
+    db_name: scenarios
   - id: postgres-test
     type: postgres
     name: PostgreSQL

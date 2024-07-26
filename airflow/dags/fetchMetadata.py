@@ -179,14 +179,18 @@ def manage_relationships(**kwargs):
     for routine in routines:
         procedure_name = routine[0]
         parser = SQLParser(routine[1])
-        objects, columns = parser.extract_related_objects()
+        target_objects, source_objects, columns = parser.extract_related_objects()
         for relationship in columns:
             if len(relationship) > 0:
                 relationships_details.append({"routine": procedure_name.upper(), "object": next(iter(relationship)).upper(),
                                               "columns": relationship[next(iter(relationship))]})
-        for obj in objects:
-            if obj != procedure_name:
-                relationships.append({"source": procedure_name.upper(), "target": obj.upper()})
+        for source_object in source_objects:
+            if source_object != procedure_name:
+                relationships.append({"source": source_object.upper(), "target": procedure_name.upper()})
+
+        for target_object in target_objects:
+            if target_object != procedure_name:
+                relationships.append({"source": procedure_name.upper(), "target": target_object.upper()})
 
     engine = get_lineage_database_engine()
     session = sessionmaker(bind=engine)()

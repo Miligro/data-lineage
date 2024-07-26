@@ -3,52 +3,63 @@ version: "3.8"
 name: lineage-databases
 
 services:
-  model-train-database:
+  # model-train-database:
+  #   image: postgres
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: postgres
+  #     POSTGRES_DB: online_store
+  #   ports:
+  #     - "5433:5432"
+  #   volumes:
+  #     - ./PostgreSQL/model-train-database-init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # test-database:
+  #   image: postgres
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: postgres
+  #     POSTGRES_DB: healthcare
+  #   ports:
+  #     - "5434:5432"
+  #   volumes:
+  #     - ./PostgreSQL/test-database-init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # postgres-train:
+  #   image: postgres
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: postgres
+  #     POSTGRES_DB: finance
+  #   ports:
+  #     - "5435:5432"
+  #   volumes:
+  #     - ./PostgreSQL/train-database-init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # sqlserver-test:
+  #   build: ./SQLServer
+  #   environment:
+  #     SA_PASSWORD: "Sqlserver123"
+  #     ACCEPT_EULA: "Y"
+  #   ports:
+  #     - "1433:1433"
+
+  # oracle-test:
+  #   image: gvenzl/oracle-xe:latest
+  #   environment:
+  #     - ORACLE_PASSWORD=Oracle123
+  #   ports:
+  #     - "1521:1521"
+  #   volumes:
+      # - ./Oracle/test-database-init.sql:/container-entrypoint-initdb.d/init.sql
+
+  scenarios-database:
     image: postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: online_store
+      POSTGRES_DB: scenarios
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
-      - ./PostgreSQL/model-train-database-init.sql:/docker-entrypoint-initdb.d/init.sql
-
-  test-database:
-    image: postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: healthcare
-    ports:
-      - "5434:5432"
-    volumes:
-      - ./PostgreSQL/test-database-init.sql:/docker-entrypoint-initdb.d/init.sql
-
-  postgres-train:
-    image: postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: finance
-    ports:
-      - "5435:5432"
-    volumes:
-      - ./PostgreSQL/train-database-init.sql:/docker-entrypoint-initdb.d/init.sql
-
-  sqlserver-test:
-    build: ./SQLServer
-    environment:
-      SA_PASSWORD: "Sqlserver123"
-      ACCEPT_EULA: "Y"
-    ports:
-      - "1433:1433"
-
-  oracle-test:
-    image: gvenzl/oracle-xe:latest
-    environment:
-      - ORACLE_PASSWORD=Oracle123
-    ports:
-      - "1521:1521"
-    volumes:
-      - ./Oracle/test-database-init.sql:/container-entrypoint-initdb.d/init.sql
+      - ./PostgreSQL/scenarios-database-init.sql:/docker-entrypoint-initdb.d/init.sql
