@@ -366,7 +366,7 @@ def set_final_status(**kwargs):
 
 
 with DAG(
-        dag_id='postgres_to_django',
+        dag_id='database_lineage',
         start_date=datetime(2023, 1, 1),
         schedule_interval='@daily',
         catchup=False

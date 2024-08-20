@@ -35,7 +35,7 @@ CREATE TABLE order_products (
 
 CREATE VIEW expensive_products AS
 SELECT
-    id,
+    id as product_id,
     name,
     price
 FROM
@@ -45,32 +45,41 @@ WHERE
 
 CREATE TABLE expensive_orders_products AS
 SELECT
-    ep.id as expensive_product_id,
+    ep.product_id as expensive_product_id,
     ep.name,
     ep.price,
     op.order_id,
     op.quantity
-FROM expensive_products ep JOIN order_products op on ep.id = op.product_id;
+FROM expensive_products ep JOIN order_products op on ep.product_id = op.product_id;
+
 
 CREATE OR REPLACE PROCEDURE create_expensive_products_view()
 LANGUAGE plpgsql
 AS $$
+DECLARE
+    product_cursor CURSOR FOR
+        SELECT id, name, price FROM products WHERE price > 80;
+
+    product_record products%ROWTYPE;
 BEGIN
     DELETE FROM expensive_products;
 
-    INSERT INTO expensive_products (id, name, price)
-    SELECT
-        id,
-        name,
-        price
-    FROM
-        products
-    WHERE
-        price > 80;
+    OPEN product_cursor;
+
+    LOOP
+        FETCH product_cursor INTO product_record;
+        EXIT WHEN NOT FOUND;
+
+        INSERT INTO expensive_products (product_id, name, price)
+        VALUES (product_record.id, product_record.name, product_record.price);
+    END LOOP;
+
+    CLOSE product_cursor;
 
     CALL create_expensive_orders_products_table();
 END;
 $$;
+
 
 CREATE OR REPLACE PROCEDURE create_expensive_orders_products_table()
 LANGUAGE plpgsql
@@ -80,12 +89,12 @@ BEGIN
 
     INSERT INTO expensive_orders_products (expensive_product_id, name, price, order_id, quantity)
     SELECT
-        ep.id as expensive_product_id,
+        ep.product_id as expensive_product_id,
         ep.name,
         ep.price,
         op.order_id,
         op.quantity
-    FROM expensive_products ep JOIN order_products op on ep.id = op.product_id;
+    FROM expensive_products ep JOIN order_products op on ep.product_id = op.product_id;
 END;
 $$;
 
@@ -95,4 +104,4 @@ CREATE TEMP TABLE order_products_inactive AS
 
 CREATE TABLE expensive_order_products_inactive AS
     SELECT opi.*, ep.price
-    FROM order_products_inactive opi JOIN expensive_products ep ON opi.product_id = ep.id;
+    FROM order_products_inactive opi JOIN expensive_products ep ON opi.product_id = ep.product_id;
