@@ -39,8 +39,8 @@ def analyze_column_names(metadata):
                         continue
                     other_columns_compared += 1
                     total_similarity += jaro_winkler_similarity(col, other_col)
-                total_average_similarity += total_similarity / other_columns_compared if other_columns_compared > 0 else float('inf')
-            similarities[table][other_table] = total_average_similarity / columns_compared if columns_compared > 0 else float('inf')
+                total_average_similarity += total_similarity / other_columns_compared if other_columns_compared > 0 else 0
+            similarities[table][other_table] = total_average_similarity / columns_compared if columns_compared > 0 else 0
     return pd.DataFrame(similarities)
 
 

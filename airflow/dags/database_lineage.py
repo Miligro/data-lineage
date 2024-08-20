@@ -366,10 +366,11 @@ def set_final_status(**kwargs):
 
 
 with DAG(
-        dag_id='postgres_to_django',
-        start_date=datetime(2023, 1, 1),
-        schedule_interval='@daily',
-        catchup=False
+        dag_id='database_lineage',
+        is_paused_upon_creation=False,
+        start_date=datetime(2024, 1, 1),
+        schedule_interval=None,
+        catchup=False,
 ) as dag:
     manage_objects_task = PythonOperator(
         task_id='manage_objects',

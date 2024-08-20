@@ -209,21 +209,6 @@ FROM
 JOIN
     suppliers s ON i.supplier_id = s.supplier_id;
 
-CREATE VIEW prescription_details AS
-SELECT
-    pr.prescription_id,
-    mr.record_id,
-    mr.patient_id,
-    mr.staff_id,
-    pr.medication_name,
-    pr.dosage,
-    pr.frequency,
-    pr.duration
-FROM
-    prescriptions pr
-JOIN
-    medical_records mr ON pr.record_id = mr.record_id;
-
 CREATE VIEW staff_details AS
 SELECT
     s.staff_id,

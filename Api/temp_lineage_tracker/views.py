@@ -195,7 +195,7 @@ class ListObjectRelationshipsTargetView(View):
 
 class LineageModelView(View):
     def post(self, _, database_id):
-        url = AIRFLOW_URL.format(dag_id='postgres_to_django')
+        url = AIRFLOW_URL.format(dag_id='database_lineage')
         auth = (AIRFLOW_USERNAME, AIRFLOW_PASSWORD)
         payload = {
             "conf": {
@@ -210,7 +210,7 @@ class LineageModelView(View):
             return JsonResponse({'status': 'error', 'message': 'Failed to trigger DAG', 'details': response.json()})
 
     def get(self, _, database_id):
-        url = AIRFLOW_URL.format(dag_id='postgres_to_django')
+        url = AIRFLOW_URL.format(dag_id='database_lineage')
         auth = (AIRFLOW_USERNAME, AIRFLOW_PASSWORD)
         response = requests.get(url, auth=auth)
 
@@ -220,10 +220,10 @@ class LineageModelView(View):
                 last_run = data['dag_runs'][-1]
                 start_date = last_run['start_date']
                 state = last_run['state']
-                return JsonResponse({'start_date': start_date, 'dag_id': 'postgres_to_django', 'state': state})
+                return JsonResponse({'start_date': start_date, 'dag_id': 'database_lineage', 'state': state})
             else:
                 return JsonResponse(
-                    {'status': 'success', 'dag_id': 'postgres_to_django', 'message': 'No DAG runs found'})
+                    {'status': 'success', 'dag_id': 'database_lineage', 'message': 'No DAG runs found'})
         else:
             return JsonResponse(
                 {'status': 'error', 'message': 'Failed to retrieve DAG status', 'details': response.json()})

@@ -204,7 +204,7 @@ onMounted(() => {
       {
         selector: 'node',
         style: {
-          width: '250px',
+          width: '410px',
           height: '75px',
           shape: 'rectangle',
           backgroundColor: 'white',
@@ -261,6 +261,7 @@ onMounted(() => {
           const node = cy.value.getElementById(data.id)
           const isHighlighted = node.hasClass('highlighted')
           return `<div class="object-node ${isHighlighted ? 'highlighted-node' : ''}">
+                <span class="object-type">${data.type}</span>
                 <span class="object-label">${data.label}</span>
               </div>`
         }
@@ -358,17 +359,28 @@ onMounted(() => {
 .object-node {
   display: flex;
   align-items: center;
+  justify-content: center;
+  flex-direction: column;
   background-color: white;
   box-shadow: 0 0 4px 0 rgba(0, 0, 0, 1);
   padding: 5px;
-  width: 250px;
+  width: 410px;
   height: 75px;
   border-radius: 5px;
 }
 
 .object-label {
   display: inline-block;
-  font-weight: 600;
+  font-weight: 500;
+  word-break: break-word;
+  //overflow: hidden;
+  //text-overflow: ellipsis;
+  //white-space: nowrap;
+}
+
+.object-type {
+  display: inline-block;
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

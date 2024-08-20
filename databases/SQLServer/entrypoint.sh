@@ -1,15 +1,13 @@
 #!/bin/bash
 
-# Uruchomienie SQL Server w tle
 /opt/mssql/bin/sqlservr &
 
-# Czekanie na pełne uruchomienie SQL Server
-# Uwaga: 30 sekund to przykładowy czas. Może wymagać dostosowania w zależności od środowiska
-sleep 30
+echo "Waiting for SQL Server to start..."
+until /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "Sqlserver123" -C -Q "SELECT 1" > /dev/null 2>&1; do
+    echo "SQL Server is not ready yet. Waiting..."
+    sleep 5
+done
 
-# Wykonanie skryptu inicjalizującego
-# Uwaga: Załóżmy, że skrypt init.sql znajduje się w /usr/config
-/opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P "Sqlserver123" -i /usr/config/init.sql
+/opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "Sqlserver123" -C -i /usr/config/init.sql
 
-# Czekanie, aby kontener nie zakończył działania
 wait
