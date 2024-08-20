@@ -9,7 +9,7 @@ from collections import defaultdict
 from sqlalchemy import create_engine
 from sklearn.ensemble import RandomForestClassifier
 from jellyfish import jaro_winkler_similarity
-from Api.temp_lineage_tracker.lineage_ml.true_relationships import true_relationships
+from true_relationships import true_relationships
 
 
 param_dist = {

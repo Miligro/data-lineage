@@ -1,39 +1,39 @@
 databases:
-  - id: scenarios-database
+  - id: scenarios
     type: postgres
-    name: Scenarios Database
-    host: lineage-databases-scenarios-database-1
+    name: Scenarios
+    host: lineage-databases-scenarios-1
     port: 5432
     user: postgres
     password: postgres
     db_name: scenarios
   - id: postgres-test
     type: postgres
-    name: PostgreSQL
-    host: lineage-databases-test-database-1
+    name: PostgreSQL Test
+    host: lineage-databases-postgres-test-1
     port: 5432
     user: postgres
     password: postgres
     db_name: healthcare
   - id: postgres-train
     type: postgres
-    name: PostgreSQL train
-    host: lineage-databases-model-train-database-1
+    name: PostgreSQL Train
+    host: lineage-databases-postgres-train-1
     port: 5432
     user: postgres
     password: postgres
     db_name: online_store
-  - id: sqlserver-lineage
+  - id: sqlserver-test
     type: sqlserver
-    name: SQL Server Lineage
+    name: SQL Server Test
     host: lineage-databases-sqlserver-test-1
     port: 1433
     user: SA
     password: Sqlserver123
     db_name: healthcare
-  - id: oracle-lineage
+  - id: oracle-test
     type: oracle
-    name: Oracle Lineage
+    name: Oracle Lineage Test
     host: lineage-databases-oracle-test-1
     port: 1521
     user: C##data_lineage
