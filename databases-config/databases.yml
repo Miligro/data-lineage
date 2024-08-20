@@ -22,7 +22,7 @@ databases:
     port: 5432
     user: postgres
     password: postgres
-    db_name: online_store
+    db_name: finance
   - id: sqlserver-test
     type: sqlserver
     name: SQL Server Test
